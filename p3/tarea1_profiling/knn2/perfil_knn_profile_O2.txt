@@ -1,0 +1,123 @@
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls   s/call   s/call  name    
+ 70.80     10.78    10.78 91999998     0.00     0.00  euclidean(TSample const&, TSample const&)
+ 22.07     14.14     3.36    52551     0.00     0.00  TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*)
+  5.98     15.05     0.91    13000     0.00     0.00  knn::KNN::classify(TSample const&) const
+  1.12     15.22     0.17    70000     0.00     0.00  TSample::TSample(char const*, int, int, int)
+  0.07     15.23     0.01        9     0.00     0.00  crossValidation::CrossValidation::splitDataset(std::vector<TSample, std::allocator<TSample> >&, std::vector<TSample, std::allocator<TSample> >&, unsigned int) const
+  0.00     15.23     0.00    70000     0.00     0.00  std::vector<float, std::allocator<float> >::_M_default_append(unsigned long)
+  0.00     15.23     0.00    13000     0.00     0.00  histogram(std::vector<KNNResult, std::allocator<KNNResult> > const&, int)
+  0.00     15.23     0.00      372     0.00     0.00  void std::vector<TSample, std::allocator<TSample> >::_M_realloc_append<TSample const&>(TSample const&)
+  0.00     15.23     0.00      119     0.00     0.00  void std::vector<int, std::allocator<int> >::_M_realloc_append<int const&>(int const&)
+  0.00     15.23     0.00       12     0.00     0.00  (anonymous namespace)::readBigEndian(std::istream&, unsigned int&)
+  0.00     15.23     0.00       10     0.00     1.51  knn::KNN::classifyAndEvaluate(std::vector<TSample, std::allocator<TSample> > const&, std::vector<int, std::allocator<int> >&) const
+  0.00     15.23     0.00        8     0.00     0.00  std::vector<TSample, std::allocator<TSample> >::~vector()
+  0.00     15.23     0.00        3     0.00     0.00  crossValidation::CrossValidation::getName[abi:cxx11]() const
+  0.00     15.23     0.00        3     0.00     4.52  crossValidation::CrossValidation::validate(unsigned int) const
+  0.00     15.23     0.00        2     0.00     0.09  mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&)
+  0.00     15.23     0.00        2     0.00     0.00  std::vector<TSample, std::allocator<TSample> >::vector<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, void>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, std::allocator<TSample> const&)
+  0.00     15.23     0.00        1     0.00     0.00  std::_Vector_base<int, std::allocator<int> >::~_Vector_base()
+
+			Call graph
+
+
+granularity: each sample hit covers 2 byte(s) for 0.07% of 15.23 seconds
+
+index % time    self  children    called     name
+                                                 <spontaneous>
+[1]    100.0    0.00   15.23                 main [1]
+                0.00   13.56       3/3           crossValidation::CrossValidation::validate(unsigned int) const [4]
+                0.00    1.51       1/10          knn::KNN::classifyAndEvaluate(std::vector<TSample, std::allocator<TSample> > const&, std::vector<int, std::allocator<int> >&) const [3]
+                0.00    0.17       2/2           mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&) [8]
+                0.00    0.00      30/372         void std::vector<TSample, std::allocator<TSample> >::_M_realloc_append<TSample const&>(TSample const&) [18]
+                0.00    0.00       6/8           std::vector<TSample, std::allocator<TSample> >::~vector() [21]
+                0.00    0.00       2/2           std::vector<TSample, std::allocator<TSample> >::vector<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, void>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, std::allocator<TSample> const&) [23]
+                0.00    0.00       1/1           std::_Vector_base<int, std::allocator<int> >::~_Vector_base() [24]
+-----------------------------------------------
+                0.91   14.14   13000/13000       knn::KNN::classifyAndEvaluate(std::vector<TSample, std::allocator<TSample> > const&, std::vector<int, std::allocator<int> >&) const [3]
+[2]     98.8    0.91   14.14   13000         knn::KNN::classify(TSample const&) const [2]
+               10.78    0.00 91999998/91999998     euclidean(TSample const&, TSample const&) [5]
+                2.53    0.00   39549/52551       TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*) [6]
+                0.00    0.83   13000/13000       histogram(std::vector<KNNResult, std::allocator<KNNResult> > const&, int) [7]
+-----------------------------------------------
+                0.00    1.51       1/10          main [1]
+                0.00   13.55       9/10          crossValidation::CrossValidation::validate(unsigned int) const [4]
+[3]     98.8    0.00   15.05      10         knn::KNN::classifyAndEvaluate(std::vector<TSample, std::allocator<TSample> > const&, std::vector<int, std::allocator<int> >&) const [3]
+                0.91   14.14   13000/13000       knn::KNN::classify(TSample const&) const [2]
+                0.00    0.00     119/119         void std::vector<int, std::allocator<int> >::_M_realloc_append<int const&>(int const&) [19]
+-----------------------------------------------
+                0.00   13.56       3/3           main [1]
+[4]     89.0    0.00   13.56       3         crossValidation::CrossValidation::validate(unsigned int) const [4]
+                0.00   13.55       9/10          knn::KNN::classifyAndEvaluate(std::vector<TSample, std::allocator<TSample> > const&, std::vector<int, std::allocator<int> >&) const [3]
+                0.01    0.00       9/9           crossValidation::CrossValidation::splitDataset(std::vector<TSample, std::allocator<TSample> >&, std::vector<TSample, std::allocator<TSample> >&, unsigned int) const [10]
+                0.00    0.00     117/372         void std::vector<TSample, std::allocator<TSample> >::_M_realloc_append<TSample const&>(TSample const&) [18]
+                0.00    0.00       3/3           crossValidation::CrossValidation::getName[abi:cxx11]() const [22]
+-----------------------------------------------
+               10.78    0.00 91999998/91999998     knn::KNN::classify(TSample const&) const [2]
+[5]     70.8   10.78    0.00 91999998         euclidean(TSample const&, TSample const&) [5]
+-----------------------------------------------
+                             9555412             TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*) [6]
+                0.00    0.00       2/52551       mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&) [8]
+                0.83    0.00   13000/52551       histogram(std::vector<KNNResult, std::allocator<KNNResult> > const&, int) [7]
+                2.53    0.00   39549/52551       knn::KNN::classify(TSample const&) const [2]
+[6]     22.1    3.36    0.00   52551+9555412 TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*) [6]
+                             9555412             TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*) [6]
+-----------------------------------------------
+                0.00    0.83   13000/13000       knn::KNN::classify(TSample const&) const [2]
+[7]      5.5    0.00    0.83   13000         histogram(std::vector<KNNResult, std::allocator<KNNResult> > const&, int) [7]
+                0.83    0.00   13000/52551       TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*) [6]
+-----------------------------------------------
+                0.00    0.17       2/2           main [1]
+[8]      1.1    0.00    0.17       2         mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&) [8]
+                0.17    0.00   70000/70000       TSample::TSample(char const*, int, int, int) [9]
+                0.00    0.00       2/52551       TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*) [6]
+                0.00    0.00      12/12          (anonymous namespace)::readBigEndian(std::istream&, unsigned int&) [20]
+                0.00    0.00       2/8           std::vector<TSample, std::allocator<TSample> >::~vector() [21]
+-----------------------------------------------
+                0.17    0.00   70000/70000       mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&) [8]
+[9]      1.1    0.17    0.00   70000         TSample::TSample(char const*, int, int, int) [9]
+                0.00    0.00   70000/70000       std::vector<float, std::allocator<float> >::_M_default_append(unsigned long) [17]
+-----------------------------------------------
+                0.01    0.00       9/9           crossValidation::CrossValidation::validate(unsigned int) const [4]
+[10]     0.1    0.01    0.00       9         crossValidation::CrossValidation::splitDataset(std::vector<TSample, std::allocator<TSample> >&, std::vector<TSample, std::allocator<TSample> >&, unsigned int) const [10]
+                0.00    0.00     225/372         void std::vector<TSample, std::allocator<TSample> >::_M_realloc_append<TSample const&>(TSample const&) [18]
+-----------------------------------------------
+                0.00    0.00   70000/70000       TSample::TSample(char const*, int, int, int) [9]
+[17]     0.0    0.00    0.00   70000         std::vector<float, std::allocator<float> >::_M_default_append(unsigned long) [17]
+-----------------------------------------------
+                0.00    0.00      30/372         main [1]
+                0.00    0.00     117/372         crossValidation::CrossValidation::validate(unsigned int) const [4]
+                0.00    0.00     225/372         crossValidation::CrossValidation::splitDataset(std::vector<TSample, std::allocator<TSample> >&, std::vector<TSample, std::allocator<TSample> >&, unsigned int) const [10]
+[18]     0.0    0.00    0.00     372         void std::vector<TSample, std::allocator<TSample> >::_M_realloc_append<TSample const&>(TSample const&) [18]
+-----------------------------------------------
+                0.00    0.00     119/119         knn::KNN::classifyAndEvaluate(std::vector<TSample, std::allocator<TSample> > const&, std::vector<int, std::allocator<int> >&) const [3]
+[19]     0.0    0.00    0.00     119         void std::vector<int, std::allocator<int> >::_M_realloc_append<int const&>(int const&) [19]
+-----------------------------------------------
+                0.00    0.00      12/12          mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&) [8]
+[20]     0.0    0.00    0.00      12         (anonymous namespace)::readBigEndian(std::istream&, unsigned int&) [20]
+-----------------------------------------------
+                0.00    0.00       2/8           mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&) [8]
+                0.00    0.00       6/8           main [1]
+[21]     0.0    0.00    0.00       8         std::vector<TSample, std::allocator<TSample> >::~vector() [21]
+-----------------------------------------------
+                0.00    0.00       3/3           crossValidation::CrossValidation::validate(unsigned int) const [4]
+[22]     0.0    0.00    0.00       3         crossValidation::CrossValidation::getName[abi:cxx11]() const [22]
+-----------------------------------------------
+                0.00    0.00       2/2           main [1]
+[23]     0.0    0.00    0.00       2         std::vector<TSample, std::allocator<TSample> >::vector<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, void>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, std::allocator<TSample> const&) [23]
+-----------------------------------------------
+                0.00    0.00       1/1           main [1]
+[24]     0.0    0.00    0.00       1         std::_Vector_base<int, std::allocator<int> >::~_Vector_base() [24]
+-----------------------------------------------
+
+Index by function name
+
+   [5] euclidean(TSample const&, TSample const&) [22] crossValidation::CrossValidation::getName[abi:cxx11]() const [23] std::vector<TSample, std::allocator<TSample> >::vector<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, void>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, std::allocator<TSample> const&)
+   [7] histogram(std::vector<KNNResult, std::allocator<KNNResult> > const&, int) [4] crossValidation::CrossValidation::validate(unsigned int) const [21] std::vector<TSample, std::allocator<TSample> >::~vector()
+  [20] (anonymous namespace)::readBigEndian(std::istream&, unsigned int&) (mnist.cc) [3] knn::KNN::classifyAndEvaluate(std::vector<TSample, std::allocator<TSample> > const&, std::vector<int, std::allocator<int> >&) const [17] std::vector<float, std::allocator<float> >::_M_default_append(unsigned long)
+   [8] mnist::loadMnist(char const*, char const*, std::vector<TSample, std::allocator<TSample> >&) [2] knn::KNN::classify(TSample const&) const [19] void std::vector<int, std::allocator<int> >::_M_realloc_append<int const&>(int const&)
+   [9] TSample::TSample(char const*, int, int, int) [24] std::_Vector_base<int, std::allocator<int> >::~_Vector_base() [6] TSample* std::__do_uninit_copy<__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*>(__gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, __gnu_cxx::__normal_iterator<TSample*, std::vector<TSample, std::allocator<TSample> > >, TSample*)
+  [10] crossValidation::CrossValidation::splitDataset(std::vector<TSample, std::allocator<TSample> >&, std::vector<TSample, std::allocator<TSample> >&, unsigned int) const [18] void std::vector<TSample, std::allocator<TSample> >::_M_realloc_append<TSample const&>(TSample const&)

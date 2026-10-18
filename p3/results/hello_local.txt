@@ -1,0 +1,5 @@
+ PID: 9525 Hello from process 2 out of 4 on pc-n4th0 processor 10 
+¡Hola! desde el procesador 2
+ PID: 9525 Hello from process 1 out of 4 on pc-n4th0 processor 9 
+ PID: 9525 Hello from process 3 out of 4 on pc-n4th0 processor 3 
+ PID: 9525 Hello from process 0 out of 4 on pc-n4th0 processor 0 

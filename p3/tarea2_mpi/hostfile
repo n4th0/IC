@@ -1,0 +1,8 @@
+# hostfile - plantilla para el multicomputador del laboratorio.
+# Una linea por nodo (nombre o IP). Copiar a todas las maquinas en el mismo
+# directorio de trabajo y dar permisos: chmod 600 hostfile
+#
+# Sustituir por las IPs/nombres reales de vuestros nodos, p. ej.:
+# 192.168.1.10
+# 192.168.1.11
+# 192.168.1.12

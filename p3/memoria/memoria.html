@@ -1,0 +1,888 @@
+<!doctype html><html><head>
+<meta charset="utf-8">
+<style>
+  body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11px; line-height: 1.45;
+         margin: 28px 34px; color: #1a202c; }
+  h1 { font-size: 22px; border-bottom: 2px solid #2b6cb0; padding-bottom: 4px; }
+  h2 { font-size: 17px; margin-top: 22px; border-bottom: 1px solid #cbd5e0; padding-bottom: 3px; color: #2b6cb0; }
+  h3 { font-size: 14px; margin-top: 16px; color: #2c5282; }
+  table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  th, td { border: 1px solid #a0aec0; padding: 3px 6px; text-align: left; }
+  th { background: #e2e8f0; }
+  code, pre { font-family: 'DejaVu Sans Mono', monospace; background: #f7fafc; }
+  pre { border: 1px solid #e2e8f0; padding: 8px; overflow-x: auto; }
+  blockquote { border-left: 3px solid #f6ad55; background: #fffaf0; margin: 8px 0; padding: 4px 12px; }
+  img { max-width: 100%; }
+  h1, h2, h3 { page-break-after: avoid; }
+  table, pre, img { page-break-inside: avoid; }
+</style>
+</head><body><h1 id="practica-3-paralelismo-en-sistemas-de-memoria-distribuida-mpi">Práctica 3. Paralelismo en sistemas de memoria distribuida (MPI)</h1>
+<p><strong>Asignatura:</strong> Ingeniería de los Computadores — Curso 2026-27
+<strong>Contenido:</strong> Tareas 0 a 4 de la guía de la Práctica 3.</p>
+<hr />
+<h2 id="1-introduccion-y-objetivos">1. Introducción y objetivos</h2>
+<p>El objetivo de esta práctica es estudiar el paralelismo en sistemas de memoria
+distribuida mediante MPI (Message Passing Interface). Para ello:</p>
+<ol>
+<li>Se analizan dos factores que condicionan el diseño de un programa paralelo
+   (Tarea 0).</li>
+<li>Se perfilan con <code>gprof</code> el código propio de la práctica anterior y el código
+   proporcionado para localizar los cuellos de botella (Tarea 1).</li>
+<li>Se aprende a compilar y ejecutar código MPI de forma distribuida (Tarea 2).</li>
+<li>Se paraleliza el código secuencial propio (simulación de N cuerpos) (Tarea 3).</li>
+<li>Se paraleliza un clasificador kNN con validación cruzada y ajuste de
+   hiperparámetros, incluyendo un modo de paralelismo funcional con ejecución
+   especulativa (Tarea 4).</li>
+</ol>
+<h2 id="2-entorno-experimental-y-arquitectura">2. Entorno experimental y arquitectura</h2>
+<p>Todas las medidas se han realizado en la siguiente máquina (salvo la ejecución
+distribuida de la Tarea 2, cuyo procedimiento para el clúster real se documenta):</p>
+<table>
+<thead>
+<tr>
+<th>Característica</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU</td>
+<td>AMD Ryzen 7 5800X (Zen 3)</td>
+</tr>
+<tr>
+<td>Núcleos / hilos</td>
+<td>8 núcleos físicos / 16 hilos lógicos (SMT)</td>
+</tr>
+<tr>
+<td>Frecuencia</td>
+<td>3.8 GHz base, hasta 4.85 GHz turbo</td>
+</tr>
+<tr>
+<td>Caché L1</td>
+<td>8 × 32 KiB datos + 8 × 32 KiB instrucciones</td>
+</tr>
+<tr>
+<td>Caché L2</td>
+<td>8 × 512 KiB (4 MiB total)</td>
+</tr>
+<tr>
+<td>Caché L3</td>
+<td>32 MiB compartida</td>
+</tr>
+<tr>
+<td>Memoria</td>
+<td>NUMA: 1 nodo (0-15)</td>
+</tr>
+<tr>
+<td>Sistema operativo</td>
+<td>Debian GNU/Linux 13 (trixie)</td>
+</tr>
+<tr>
+<td>Compilador</td>
+<td>g++ 14.2.0</td>
+</tr>
+<tr>
+<td>MPI</td>
+<td>Open MPI 5.0.7</td>
+</tr>
+<tr>
+<td>Profiling</td>
+<td>gprof (GNU binutils)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Nota sobre el clúster.</strong> La guía pide desarrollar la práctica sobre un
+multicomputador de <strong>al menos 3 computadores</strong>. Por disponibilidad de recursos,
+el desarrollo y la toma de medidas se han hecho sobre un único nodo lanzando
+<code>mpirun</code> con varios procesos (memoria compartida emulando paso de mensajes,
+que es el mismo modelo de programación MPI). En la Tarea 2 se documenta el
+procedimiento completo (hostfile, certificado SSH y orden <code>mpirun</code>) para
+trasladarlo al clúster del laboratorio. Los <em>aspectos algorítmicos</em> medidos
+(comportamiento de las comunicaciones colectivas, balance de carga, coste de
+sincronización) no dependen de si los procesos residen en la misma máquina,
+aunque los tiempos absolutos de red serán mayores en un clúster real.</p>
+</blockquote>
+<hr />
+<h2 id="3-tarea-0-aspectos-que-impactan-en-un-diseno-paralelo">3. Tarea 0. Aspectos que impactan en un diseño paralelo</h2>
+<h3 id="31-el-problema-de-los-vectores-dinamicos">3.1 El problema de los vectores dinámicos</h3>
+<p>Se comparan dos formas de inicializar un <code>std::vector&lt;int&gt;</code> de tamaño <code>SIZE</code>:</p>
+<ul>
+<li><strong>A:</strong> declarar el vector vacío y añadir cada elemento con <code>push_back</code>.</li>
+<li><strong>B:</strong> declarar el vector ya dimensionado (<code>std::vector&lt;int&gt; b(SIZE)</code>) y
+  escribir por índice (<code>b[i] = i</code>).</li>
+</ul>
+<p>Programa: <code>p3/tarea0/vector_bench.cpp</code>. Resultados (<code>results/tarea0_vector.csv</code>):</p>
+<table>
+<thead>
+<tr>
+<th>SIZE</th>
+<th>A: <code>push_back</code> (s)</th>
+<th>B: pre-sized <code>[i]</code> (s)</th>
+<th>Ganancia A/B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100 000</td>
+<td>0.000336</td>
+<td>0.000115</td>
+<td>2.92×</td>
+</tr>
+<tr>
+<td>1 000 000</td>
+<td>0.002134</td>
+<td>0.000635</td>
+<td>3.36×</td>
+</tr>
+<tr>
+<td>10 000 000</td>
+<td>0.014481</td>
+<td>0.005239</td>
+<td>2.76×</td>
+</tr>
+<tr>
+<td>50 000 000</td>
+<td>0.062795</td>
+<td>0.033373</td>
+<td>1.88×</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Respuestas:</strong></p>
+<ul>
+<li><em>¿Qué diferencias hay?</em> Ambas construyen el mismo vector final, pero A crece
+  dinámicamente y B reserva la memoria de una sola vez.</li>
+<li><em>¿Cuál es más rápida?</em> <strong>B</strong>, entre ~1.9× y ~3.4× según el tamaño.</li>
+<li><em>¿A qué se debe?</em> <code>push_back</code> provoca <strong>realojos</strong> periódicos: cuando el tamaño
+  supera la capacidad, la implementación reserva un bloque mayor (factor de
+  crecimiento) y <strong>copia</strong> todos los elementos existentes. El coste total es
+  O(SIZE) amortizado, pero con un factor constante mucho mayor (copias de memoria
+  y posibles fallos de caché/TLB). B evita por completo esos realojos y copias.</li>
+<li><em>¿Se pueden paralelizar ambas?</em> <strong>B sí</strong>, de forma directa: es paralelismo de
+  datos puro, cada hilo/proceso rellena un rango de índices disjunto
+  (<code>b[lo..hi)</code>). <strong>A no de forma trivial</strong>: <code>push_back</code> modifica el tamaño de
+  forma dependiente y el número de realojos depende del patrón de inserciones;
+  para paralelizar A habría que conocer el tamaño final (reservarlo) o repartir
+  posiciones y concatenar después, lo que añade sincronización. La conclusión de
+  diseño es <strong>reservar/particionar de antemano</strong> antes de paralelizar.</li>
+</ul>
+<h3 id="32-recorrido-de-matrices">3.2 Recorrido de matrices</h3>
+<p>Se recorren dos matrices <code>N×N</code> (en C almacenadas <strong>por filas</strong>, <em>row-major</em>):</p>
+<ul>
+<li><strong>A:</strong> recorrido por columnas <code>a[j][i] = i+j</code> (bucle exterior <code>i</code>, interior <code>j</code>).</li>
+<li><strong>B:</strong> recorrido por filas <code>b[i][j] = i+j</code>.</li>
+</ul>
+<p>Programa: <code>p3/tarea0/matrix_bench.cpp</code>. Resultados (<code>results/tarea0_matrix.csv</code>):</p>
+<table>
+<thead>
+<tr>
+<th>N</th>
+<th>A: por columnas (s)</th>
+<th>B: por filas (s)</th>
+<th>Ganancia A/B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>500</td>
+<td>0.000182</td>
+<td>0.000066</td>
+<td>2.76×</td>
+</tr>
+<tr>
+<td>1000</td>
+<td>0.000524</td>
+<td>0.000222</td>
+<td>2.36×</td>
+</tr>
+<tr>
+<td>1500</td>
+<td>0.001267</td>
+<td>0.000472</td>
+<td>2.68×</td>
+</tr>
+<tr>
+<td>2000</td>
+<td>0.002321</td>
+<td>0.000984</td>
+<td>2.36×</td>
+</tr>
+<tr>
+<td>3000</td>
+<td>0.007652</td>
+<td>0.002851</td>
+<td>2.68×</td>
+</tr>
+<tr>
+<td>4000</td>
+<td>0.013330</td>
+<td>0.005201</td>
+<td>2.56×</td>
+</tr>
+<tr>
+<td>6000</td>
+<td>0.028211</td>
+<td>0.011659</td>
+<td>2.42×</td>
+</tr>
+<tr>
+<td>8000</td>
+<td>0.076362</td>
+<td>0.020661</td>
+<td>3.70×</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Micro-benchmarks de la Tarea 0: vectores dinamicos y recorrido de matrices" src="../figures/fig_tarea0.png" /></p>
+<p><strong>Respuestas:</strong></p>
+<ul>
+<li><em>¿Qué diferencias hay?</em> El orden de acceso a memoria. En A, cada iteración
+  interior salta <code>N</code> elementos; en B se accede a posiciones consecutivas.</li>
+<li><em>¿Cuál se ejecuta más rápido?</em> <strong>B</strong> (recorrido por filas).</li>
+<li><em>¿A partir de qué tamaño se nota?</em> Con <code>N≳1000</code> la matriz (≥4 MB) ya no cabe
+  en L2 y la diferencia empieza a ser clara; crece al aumentar <code>N</code>, hasta ~4× en
+  <code>N=8000</code>.</li>
+<li><em>¿A qué se debe?</em> <strong>Localidad de caché</strong>. Una línea de caché (64 B) contiene
+  16 <code>int</code>. En B se aprovechan las 16 posiciones antes de traer la siguiente
+  línea (<em>spatial locality</em>) y el prefetch y el HW van adelantados. En A, cada
+  acceso usa 1 de cada 16 posiciones y salta <code>N</code> enteros: casi cada acceso es un
+  <em>cache miss</em> y se traen líneas completas con un único dato útil; además se
+  generan más accesos a TLB por los saltos grandes.</li>
+</ul>
+<h3 id="33-entregable-que-cambios-hay-que-hacer-antes-de-aplicar-mpi">3.3 Entregable: ¿qué cambios hay que hacer antes de aplicar MPI?</h3>
+<p>De los dos casos se extraen las siguientes directrices, aplicadas en las Tareas
+3 y 4:</p>
+<ol>
+<li><strong>Reservar/particionar el almacenamiento antes de paralelizar</strong> (evitar
+   estructuras que crecen dinámicamente como <code>push_back</code>).</li>
+<li><strong>Preservar la localidad de memoria (row-major, acceso contiguo)</strong> y
+   distribuir los datos por bloques contiguos.</li>
+<li><strong>Evitar copias profundas</strong>: en <code>knn2</code>, el 22 % del tiempo secuencial a <code>-O2</code>
+   se debe a copias de <code>TSample</code> (constructor de <code>KNN</code> y <code>splitDataset</code>). La
+   versión paralela trabaja con <strong>índices</strong> sobre el dataset en lugar de copiar
+   subconjuntos.</li>
+<li><strong>Replicar los datos inmutables</strong> (constantes, masas, etiquetas) para no
+   comunicarlos en cada paso.</li>
+</ol>
+<hr />
+<h2 id="4-tarea-1-analisis-del-rendimiento-secuencial-mediante-gprof">4. Tarea 1. Análisis del rendimiento secuencial mediante gprof</h2>
+<p>Para cada programa se compiló con <code>-g -pg</code> a <code>-O0</code> y a <code>-O2</code>, se ejecutó y se
+analizó con <code>gprof -b -p -q</code> (perfil plano + grafo de llamadas). Los informes
+completos están en <code>p3/tarea1_profiling/</code>.</p>
+<h3 id="41-codigo-propio-simulacion-de-n-cuerpos-srcmaincpp">4.1 Código propio: simulación de N cuerpos (<code>src/main.cpp</code>)</h3>
+<p>Ejecución: <code>3000</code> partículas, <code>50</code> pasos (<code>perfil_O0.txt</code>, <code>perfil_O2.txt</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Función</th>
+<th>-O0 (% tiempo)</th>
+<th>-O2 (% tiempo)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>compute_forces</code></td>
+<td>83.2 %</td>
+<td><strong>95.9 %</strong></td>
+</tr>
+<tr>
+<td><code>std::vector&lt;Particle&gt;::operator[]</code></td>
+<td>13.9 %</td>
+<td>— (inlined)</td>
+</tr>
+<tr>
+<td><code>std::vector&lt;Particle&gt;::size()</code></td>
+<td>1.7 %</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Conclusión: <strong><code>compute_forces</code> concentra casi todo el tiempo</strong> (O(n²) por paso).
+Es la única candidata clara a paralelizar; <code>integrate</code> y <code>report_step</code> son
+O(n) y marginales. Tiempos totales: <code>-O0</code> ≈ 17.6 s frente a <code>-O2</code> ≈ 1.69 s.</p>
+<h3 id="42-codigo-proporcionado-clasificador-knn-knn2">4.2 Código proporcionado: clasificador kNN (<code>knn2</code>)</h3>
+<p>Se perfilaron dos configuraciones: (a) un <strong>driver reducido</strong> configurable
+(<code>p3/tarea1_profiling/knn_profile.cc</code>, ~15 s) para poder comparar <code>-O0</code> y <code>-O2</code>,
+y (b) la <strong>ejecución completa</strong> del programa tal cual (<code>cv</code>, 639 s) para obtener
+el perfil representativo.</p>
+<p>Perfil completo a <code>-O2</code> (<code>perfil_knn_O2_full.txt</code>, <code>cv</code> sin modificar):</p>
+<table>
+<thead>
+<tr>
+<th>Función</th>
+<th>% tiempo</th>
+<th>Nº llamadas</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>euclidean</code></td>
+<td><strong>70.9 %</strong></td>
+<td>3 800 000 000</td>
+</tr>
+<tr>
+<td><code>__do_uninit_copy</code> (copias de <code>TSample</code>)</td>
+<td><strong>22.8 %</strong></td>
+<td>856 526 (142 s)</td>
+</tr>
+<tr>
+<td><code>knn::KNN::classify</code> (ordenación + voto)</td>
+<td>6.3 %</td>
+<td>210 000</td>
+</tr>
+<tr>
+<td><code>TSample::TSample</code> (carga/resize MNIST)</td>
+<td>0.02 %</td>
+<td>70 000</td>
+</tr>
+</tbody>
+</table>
+<p>Perfil reducido a <code>-O0</code> (<code>perfil_knn_profile_O0.txt</code>): <code>euclidean</code> 72.3 % y el
+conjunto de operaciones de <strong>ordenación</strong> (<code>std::sort</code> sobre <code>KNNResult</code>:
+<code>__unguarded_partition</code>, <code>operator&lt;</code>, <code>__unguarded_linear_insert</code>, iteradores)
+≈ 15 % adicional.</p>
+<p><strong>Conclusiones:</strong>
+- El <strong>cálculo de distancias euclídeas</strong> domina de forma abrumadora (≈ 70 %),
+  seguido de la <strong>ordenación</strong> de vecinos y, a <code>-O2</code>, de las <strong>copias de
+  <code>TSample</code></strong> (≈ 23 %). Al activar optimizaciones, el coste de ordenación se
+  diluye (el compilador lo optimiza) pero las copias de <code>std::vector&lt;float&gt;</code>
+  (producto de <code>KNN(train,…)</code>, que <strong>copia</strong> todo el conjunto de entrenamiento en
+  cada fold, y de <code>splitDataset</code>, que copia muestras) pasan a ser muy relevantes.
+- Candidatos a optimizar/paralelizar: <strong>(1)</strong> el cálculo de distancias (bucle
+  <code>classify</code>), <strong>(2)</strong> el bucle sobre muestras de test/validación y <strong>(3)</strong> el
+  bucle de búsqueda de <code>K</code> y de folds. Además, <strong>eliminar copias</strong> es una
+  optimización secuencial clave (motiva el diseño por índices de la Tarea 4).</p>
+<p><img alt="Perfiles de gprof a -O0 y -O2 (N-cuerpos y kNN)" src="../figures/fig_profiling.png" /></p>
+<p><em>(Figura resumen en formato visual; los informes completos de <code>gprof</code> con el
+perfil plano y el grafo de llamadas están en <code>p3/tarea1_profiling/</code>.)</em></p>
+<hr />
+<h2 id="5-tarea-2-ejecucion-distribuida-de-codigo-mpi">5. Tarea 2. Ejecución distribuida de código MPI</h2>
+<h3 id="51-codigo-hola-mundo">5.1 Código "hola mundo"</h3>
+<p><code>p3/tarea2_mpi/hello_mpi.c</code> reproduce el ejemplo de la guía (usa
+<code>MPI_Comm_size</code>, <code>MPI_Comm_rank</code>, <code>MPI_Get_processor_name</code> y <code>sched_getcpu()</code>).</p>
+<h3 id="52-compilacion-y-ejecucion-en-el-cluster">5.2 Compilación y ejecución en el clúster</h3>
+<p>Procedimiento (detallado en <code>p3/tarea2_mpi/README_MPI.md</code>):</p>
+<ol>
+<li>Instalar Open MPI (<code>sudo apt install openmpi-bin libopenmpi-dev</code>).</li>
+<li>Compilar: <code>mpicc hello_mpi.c -o hello_mpi</code>.</li>
+<li>Mismo usuario, mismo directorio (<code>$HOME</code>) y mismo ejecutable en todos los nodos.</li>
+<li>Crear <code>hostfile</code> con la IP/nombre de cada nodo (plantilla en
+   <code>p3/tarea2_mpi/hostfile</code>); <code>chmod 600 hostfile</code>.</li>
+<li>Certificado SSH: <code>ssh-keygen -t rsa</code> y copiar <code>~/.ssh/id_rsa.pub</code> a
+   <code>~/.ssh/authorized_keys</code> de los demás nodos.</li>
+<li><code>chmod o+x hello_mpi</code> y ejecutar:</li>
+</ol>
+<pre><code class="language-bash">mpirun -mca plm_rsh_no_tree_spawn 1 -hostfile hostfile -n 6 ./hello_mpi
+</code></pre>
+<h3 id="53-resultado-observado-ejecucion-local-4-procesos">5.3 Resultado observado (ejecución local, 4 procesos)</h3>
+<p><code>results/hello_local.txt</code>:</p>
+<pre><code> PID: 9525 Hello from process 2 out of 4 on pc-n4th0 processor 10
+ ¡Hola! desde el procesador 2
+ PID: 9525 Hello from process 1 out of 4 on pc-n4th0 processor 9
+ PID: 9525 Hello from process 3 out of 4 on pc-n4th0 processor 3
+ PID: 9525 Hello from process 0 out of 4 on pc-n4th0 processor 0
+</code></pre>
+<p>Se observa que cada proceso se reparte por núcleos distintos y que el proceso de
+rango 2 ejecuta su rama específica. (El <code>PID</code> coincide porque <code>getppid()</code> devuelve
+el proceso <code>mpirun</code> padre.)</p>
+<hr />
+<h2 id="6-tarea-3-paralelizacion-del-codigo-identificado-n-cuerpos">6. Tarea 3. Paralelización del código identificado (N cuerpos)</h2>
+<h3 id="61-analisis-de-la-solucion-secuencial">6.1 Análisis de la solución secuencial</h3>
+<p>El bucle principal (ver <code>p3/tarea1_profiling/nbody/perfil_O2.txt</code>) es:</p>
+<pre><code>for step in [0, n_steps):
+    compute_forces(particles)   # O(n^2) -&gt; 96% del tiempo
+    integrate(particles, dt)    # O(n)
+    if step % 10 == 0: report_step(particles, step)  # O(n) + E/S
+</code></pre>
+<p><strong>Dependencias:</strong> entre pasos existe una dependencia <em>secuencial</em>
+(paso <em>N</em> depende del <em>N-1</em>), pero <strong>dentro</strong> de <code>compute_forces</code> no hay
+dependencia: <code>fx,fy</code> de cada partícula <code>i</code> se calculan con las posiciones actuales
+de todas las demás, sin escribir posiciones ajenas → <strong>paralelismo de datos</strong> puro
+sobre el bucle externo <code>i</code> (que es el O(n²) y domina). <code>integrate</code> también es
+paralelismo de datos.</p>
+<h3 id="62-diseno-e-implementacion-p3tarea3_nbodynbody_mpicpp">6.2 Diseño e implementación (<code>p3/tarea3_nbody/nbody_mpi.cpp</code>)</h3>
+<ul>
+<li><strong>Descomposición de dominio (paralelismo de datos):</strong> cada proceso posee un
+  subconjunto de partículas (<code>block</code> contiguo o <code>cyclic</code> round-robin).</li>
+<li>Como la fuerza sobre <code>i</code> depende de <strong>todas</strong> las partículas, en cada paso se
+  hace un <strong><code>MPI_Allgatherv</code></strong> de las posiciones <code>(x,y)</code> para que todos los
+  procesos tengan el estado global actualizado. <code>Allgatherv</code> (variante "v") admite
+  tamaños de bloque distintos (útil con <code>cyclic</code> y con restos).</li>
+<li>Las masas son <strong>constantes</strong> → se replican una vez (no se comunican por paso).</li>
+<li>La energía cinética se acumula localmente y se combina con <strong><code>MPI_Reduce</code></strong>
+  (SUM) hacia el rango 0, que actúa como <strong>rank de E/S</strong> (paralelismo funcional).</li>
+<li>Se miden por separado <strong>tiempo de cómputo</strong> y <strong>tiempo de comunicación</strong>.</li>
+</ul>
+<p>Funciones MPI empleadas: <code>MPI_Init/Finalize</code>, <code>MPI_Comm_rank/size</code>, <code>MPI_Barrier</code>,
+<code>MPI_Allgatherv</code> (comunicación colectiva, todos-a-todos), <code>MPI_Reduce</code>
+(colectiva, reducción a un nodo), <code>MPI_Wtime</code> (cronómetro).</p>
+<p><strong>Modelo, estilo y estructura:</strong> modelo de <strong>paso de mensajes</strong> con <strong>SPMD</strong>
+(mismo programa, datos distintos por proceso); estilo de <strong>grano grueso</strong> con
+<strong>descomposición de dominio</strong>; estructura <strong>SPMD simétrica</strong> con una comunicación
+colectiva por iteración y un papel especial para el <strong>rank 0</strong> (E/S). Se evita
+comunicar las masas (constantes) mediante <strong>replicación</strong>, reduciendo el coste
+por paso a sólo las posiciones.</p>
+<h3 id="63-resultados">6.3 Resultados</h3>
+<p>Modelo de coste por paso y por proceso:
+<code>computo = O(n² / P)</code>, <code>comunicación = O(n)</code>.
+La relación comunicación/cómputo es <code>≈ 2P/n</code>, que disminuye al crecer <code>n</code> →
+en problemas grandes la paralelización escala muy bien.</p>
+<p>Tiempos secuenciales (referencia, <code>nbody_seq</code>): n=2000 → 0.751 s; n=4000 →
+3.006 s; n=8000 → 12.004 s (50 pasos).</p>
+<p><strong>Speed-up</strong> (respecto al secuencial) y <strong>% de tiempo en comunicaciones</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>n</th>
+<th>reparto</th>
+<th>P=1</th>
+<th>P=2</th>
+<th>P=4</th>
+<th>P=8</th>
+<th>eff. P=8</th>
+<th>% comm (P=8)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2000</td>
+<td>block</td>
+<td>1.00</td>
+<td>1.97</td>
+<td>3.93</td>
+<td><strong>7.63</strong></td>
+<td>0.95</td>
+<td>2.8 %</td>
+</tr>
+<tr>
+<td>4000</td>
+<td>block</td>
+<td>0.99</td>
+<td>1.97</td>
+<td>3.90</td>
+<td><strong>7.58</strong></td>
+<td>0.95</td>
+<td>2.6 %</td>
+</tr>
+<tr>
+<td>8000</td>
+<td>block</td>
+<td>0.99</td>
+<td>1.96</td>
+<td>3.88</td>
+<td><strong>7.54</strong></td>
+<td>0.94</td>
+<td>2.3 %</td>
+</tr>
+<tr>
+<td>2000</td>
+<td>cyclic</td>
+<td>0.99</td>
+<td>1.97</td>
+<td>3.91</td>
+<td><strong>7.62</strong></td>
+<td>0.95</td>
+<td>2.6 %</td>
+</tr>
+<tr>
+<td>4000</td>
+<td>cyclic</td>
+<td>0.99</td>
+<td>1.97</td>
+<td>3.54</td>
+<td><strong>7.27</strong></td>
+<td>0.91</td>
+<td>4.6 %</td>
+</tr>
+<tr>
+<td>8000</td>
+<td>cyclic</td>
+<td>0.99</td>
+<td>1.95</td>
+<td>3.87</td>
+<td><strong>7.56</strong></td>
+<td>0.94</td>
+<td>2.2 %</td>
+</tr>
+</tbody>
+</table>
+<p>El speed-up es prácticamente lineal hasta <code>P=8</code> (todos los núcleos físicos) con
+eficiencias ≈ 0.94-0.95. El proceso de rango 0 acumula <code>comp</code> y <code>comm</code> máximos;
+el porcentaje de comunicación se mantiene por debajo del 5 %. El repunte de
+<code>cyclic, n=4000, P=4</code> (≈ 7 % de comunicación y 3.54× de speed-up) es un valor
+anómalo puntual (interferencia del sistema); el resto de medidas son coherentes
+con el modelo.</p>
+<p>Figuras: <code>figures/fig_tarea3_speedup.png</code> (speed-up y eficiencia) y
+<code>figures/fig_tarea3_comm.png</code> (porcentaje de tiempo en comunicaciones).
+Diagrama de flujo: <code>figures/fig_tarea3_flow.png</code>.</p>
+<p><img alt="Speed-up y eficiencia (N-cuerpos)" src="../figures/fig_tarea3_speedup.png" /></p>
+<p><img alt="Coste de comunicacion (N-cuerpos)" src="../figures/fig_tarea3_comm.png" /></p>
+<p><img alt="Grafo de flujo secuencial vs MPI (N-cuerpos)" src="../figures/fig_tarea3_flow.png" /></p>
+<h3 id="64-respuestas-a-las-cuestiones-de-evaluacion">6.4 Respuestas a las cuestiones de evaluación</h3>
+<ol>
+<li><strong>Ganancia en función de P y del tamaño.</strong> Ver <code>fig_tarea3_speedup.png</code>. El
+   speed-up es prácticamente lineal en <code>P</code> y mejora al aumentar <code>n</code> (menor peso
+   relativo de las comunicaciones y del arranque). Ver tabla.</li>
+<li><strong>¿Mejora siempre al aumentar P? ¿qué limita la escalabilidad?</strong> Sí hasta el
+   número de núcleos físicos (8); con P≥9 se entra en SMT (2 hilos/núcleo) y la
+   ganancia se aplana. Limitantes: (a) las <strong>comunicaciones</strong> <code>O(n)</code> por paso,
+   cuyo peso relativo crece con <code>P</code>; (b) las <strong>barreras de sincronización</strong>
+   (<code>MPI_Allgatherv</code> es bloqueante); (c) la <strong>parte serie</strong> (inicialización,
+   salida, desbalanceo por <code>n % P</code>); (d) el <strong>ancho de banda de memoria</strong> al
+   replicar las posiciones en todos los procesos.</li>
+<li><strong>Impacto de las comunicaciones.</strong> Del desglose <code>comp</code>/<code>comm</code> (tabla y figura)
+   se observa que el tiempo de comunicación es una fracción pequeña (&lt; ~10 %), y
+   que su proporción crece con <code>P</code> y con <code>n</code> pequeña. Como el cómputo es <code>O(n²)P</code>
+   por proceso y la comunicación <code>O(n)</code>, en problemas grandes el reparto
+   cómputo/comunicación es favorable.</li>
+<li><strong>Comparación de estrategias.</strong> <code>block</code> y <code>cyclic</code> rinden de forma similar
+   cuando <code>n</code> es múltiplo de <code>P</code>; <code>cyclic</code> equilibra mejor cuando <code>n</code> no es
+   divisible (evita el proceso "corto") a costa de bloques no contiguos. En estos
+   tamaños las diferencias son pequeñas → ver tabla.</li>
+<li><strong>Ganancia máxima teórica.</strong> <code>P</code> (paralelismo casi perfecto, ligera ley de
+   Amdahl por partes series). No se alcanza por comunicaciones, sincronización,
+   desbalanceo y saturación de memoria.</li>
+<li><strong>Comparación secuencial vs paralela.</strong> La versión paralela gana a partir de
+   P≥2 y converge a <code>P×</code>; la eficiencia se mantiene alta (ver tabla).</li>
+</ol>
+<hr />
+<h2 id="7-tarea-4-paralelizacion-del-clasificador-knn">7. Tarea 4. Paralelización del clasificador kNN</h2>
+<h3 id="71-analisis-de-la-solucion-secuencial-knn2">7.1 Análisis de la solución secuencial (<code>knn2</code>)</h3>
+<p>Flujo secuencial (<code>p3/tarea4_knn/</code>, <code>figures/fig_tarea4_flow.png</code>):</p>
+<pre><code>load MNIST (train, test)
+fine-tuning:  for k in [minK,maxK]:
+                  N-Fold CV: for fold:  KNN(train_fold, k).classifyAndEvaluate(val_fold)
+                  accuracy(k) = media de folds
+              best k = argmax accuracy
+evaluacion final: KNN(train, best_k).classifyAndEvaluate(test)
+</code></pre>
+<p>El coste O(N_train·N_eval·dim) por consulta (perfil: <code>euclidean</code> 71 %), más el
+segundo cuello de botella (copias de <code>TSample</code>, 23 % a <code>-O2</code>). <strong>Dependencias:</strong>
+<code>splits</code> entre folds son <strong>independientes</strong>; los distintos <strong>valores de K</strong> son
+<strong>independientes</strong> entre sí; las muestras de test/validación son
+<strong>independientes</strong> entre sí. Existe dependencia entre el fine-tuning y la
+evaluación final (la evaluación necesita el <code>best k</code>).</p>
+<h3 id="72-diseno-e-implementacion-p3tarea4_knnknn_mpicpp">7.2 Diseño e implementación (<code>p3/tarea4_knn/knn_mpi.cpp</code>)</h3>
+<p>Se identifican y explotan <strong>cuatro</strong> estrategias, seleccionables con
+<code>--strategy</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Estrategia</th>
+<th>Tipo de paralelismo</th>
+<th>Qué se reparte</th>
+<th>Comunicación</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test</code></td>
+<td>datos</td>
+<td>muestras de validación/test</td>
+<td><code>MPI_Allreduce</code> (nº aciertos)</td>
+</tr>
+<tr>
+<td><code>k</code></td>
+<td>tareas</td>
+<td>valores del hiperparámetro K</td>
+<td><code>MPI_Allreduce</code> (MAX de acc.)</td>
+</tr>
+<tr>
+<td><code>folds</code></td>
+<td>tareas</td>
+<td>folds de la validación cruzada</td>
+<td><code>MPI_Allreduce</code> (SUM de acc.)</td>
+</tr>
+<tr>
+<td><code>spec</code></td>
+<td>funcional + especulativo</td>
+<td>fine-tuning ‖ evaluación</td>
+<td>punto a punto (<code>MPI_Send/Recv/Iprobe</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Decisiones clave:</p>
+<ol>
+<li><strong>Evaluación por índices (sin copias).</strong> Para evitar el 23 % de tiempo en
+   copias de <code>TSample</code>, la versión MPI no materializa train/validación: clasifica
+   cada muestra contra los <strong>índices</strong> del conjunto de entrenamiento del fold
+   (<code>foldTrainIdx</code>). Se conserva exactamente el comparador de distancia y el
+   desempate (etiqueta menor) del código original, de modo que <strong>los resultados
+   coinciden bit a bit</strong> con el secuencial (comprobado: <code>bestK</code>, <code>cvAcc</code> y
+   <code>testAcc</code> idénticos).</li>
+<li><strong>Reparto de test/validación por bloques</strong> contiguos (rango <code>[lo,hi)</code>),
+   reduciendo los aciertos con <code>MPI_Allreduce</code>.</li>
+<li><strong>Modo especulativo (<code>spec</code>).</strong> Se parte el comunicador en <strong>grupo A</strong>
+   (fine-tuning) y <strong>grupo B</strong> (evaluación final). El grupo A hace el ajuste de K
+   (folds repartidos) y, cada vez que mejora el mejor K, <strong>notifica</strong> al grupo B
+   (<code>MPI_Send</code>, etiqueta <code>TAG_NEWBEST</code>). El grupo B comienza a evaluar el test con
+   el mejor K conocido y, <strong>entre trozos</strong> de muestras, sondea con
+   <strong><code>MPI_Iprobe</code></strong>; si llega un K mejor, <strong>descarta</strong> el trabajo en curso y
+   reinicia (<code>TAG_NEWBEST</code>); al terminar el ajuste recibe <code>TAG_DONE</code> con el K
+   óptimo y se asegura de haber completado la evaluación con ese K. Los mensajes
+   de control son de 1 entero (protocolo <em>eager</em>), lo que evita bloqueos.</li>
+</ol>
+<p>Funciones MPI empleadas: <code>MPI_Allreduce</code>, <code>MPI_Comm_split</code> (grupos A/B),
+<code>MPI_Send/MPI_Recv</code> (punto a punto), <code>MPI_Iprobe</code> (sondeo no bloqueante),
+<code>MPI_Bcast</code>, <code>MPI_Wtime</code>.</p>
+<h3 id="73-resultados">7.3 Resultados</h3>
+<p>Línea base secuencial (<code>seq</code>, código proporcionado): <code>train=2000</code> → 5.08 s
+(test 0.8990); <code>train=4000</code> → 19.73 s (test 0.8890). Como el ajuste de <code>K</code>
+domina, <code>tFine</code> es ~97 % del total y <code>tFinal</code> sólo ~0.3 s.</p>
+<p><strong>Speed-up respecto al secuencial</strong> (el nº de aciertos de test es idéntico en
+todas las estrategias → correctitud):</p>
+<p><code>train=4000</code> (mejor K=5, <code>cvAcc</code>=0.9403, <code>testAcc</code>=0.8890, base 19.73 s):</p>
+<table>
+<thead>
+<tr>
+<th>Estrategia</th>
+<th>P=1</th>
+<th>P=2</th>
+<th>P=4</th>
+<th>P=8</th>
+<th>eficiencia P=8</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test</code></td>
+<td>0.99</td>
+<td>1.95</td>
+<td>3.76</td>
+<td><strong>6.99</strong></td>
+<td>0.87</td>
+</tr>
+<tr>
+<td><code>k</code></td>
+<td>0.99</td>
+<td>1.95</td>
+<td>3.14</td>
+<td>4.48</td>
+<td>0.56</td>
+</tr>
+<tr>
+<td><code>folds</code></td>
+<td>0.99</td>
+<td>1.62</td>
+<td>2.37</td>
+<td>4.44</td>
+<td>0.55</td>
+</tr>
+<tr>
+<td><code>spec</code></td>
+<td>–</td>
+<td>1.00</td>
+<td>1.63</td>
+<td>2.37</td>
+<td>0.30</td>
+</tr>
+</tbody>
+</table>
+<p><code>train=2000</code> (mejor K=4, <code>cvAcc</code>=0.9160, <code>testAcc</code>=0.8990, base 5.08 s):</p>
+<table>
+<thead>
+<tr>
+<th>Estrategia</th>
+<th>P=1</th>
+<th>P=2</th>
+<th>P=4</th>
+<th>P=8</th>
+<th>eficiencia P=8</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test</code></td>
+<td>0.97</td>
+<td>1.86</td>
+<td>3.40</td>
+<td><strong>5.68</strong></td>
+<td>0.71</td>
+</tr>
+<tr>
+<td><code>k</code></td>
+<td>0.97</td>
+<td>1.86</td>
+<td>2.90</td>
+<td>3.97</td>
+<td>0.50</td>
+</tr>
+<tr>
+<td><code>folds</code></td>
+<td>0.97</td>
+<td>1.57</td>
+<td>2.26</td>
+<td>3.95</td>
+<td>0.49</td>
+</tr>
+<tr>
+<td><code>spec</code></td>
+<td>–</td>
+<td>1.02</td>
+<td>1.63</td>
+<td>2.30</td>
+<td>0.29</td>
+</tr>
+</tbody>
+</table>
+<p>Figuras: <code>figures/fig_tarea4_speedup_train4000.png</code> (y <code>…train2000</code>),
+<code>figures/fig_tarea4_spec_groups.png</code> (reparto A/B en el modo especulativo),
+<code>figures/fig_tarea4_accuracy.png</code> (control de exactitud por estrategia) y
+<code>figures/fig_tarea4_flow.png</code>.</p>
+<p><img alt="Speed-up y eficiencia kNN (train=4000)" src="../figures/fig_tarea4_speedup_train4000.png" /></p>
+<p><img alt="Reparto de grupos en modo especulativo (P=8)" src="../figures/fig_tarea4_spec_groups.png" /></p>
+<p><img alt="Grafo de flujo secuencial vs MPI (kNN)" src="../figures/fig_tarea4_flow.png" /></p>
+<h3 id="74-respuestas-a-las-cuestiones-de-evaluacion">7.4 Respuestas a las cuestiones de evaluación</h3>
+<ol start="7">
+<li><strong>Ganancia vs P y tamaño.</strong> Ver <code>fig_tarea4_speedup_*.png</code>. La estrategia
+   <code>test</code> escala de forma casi lineal (el cómputo es O(n·m) por fold). <code>k</code> y
+   <code>folds</code> escalan bien mientras <code>P ≤ nº de tareas independientes</code> (<code>maxK-minK+1</code>
+   y <code>folds</code> respectivamente); con más procesos que tareas hay <strong>ociosidad</strong>.</li>
+<li><strong>Evolución al aumentar P; límites.</strong> La mejora se satura cuando <code>P</code> supera el
+   número de tareas independientes (paralelismo de tareas con grano grueso) o los
+   núcleos físicos (SMT). Factores limitantes: desbalanceo de carga (K o folds no
+   divisibles), comunicaciones de resultados (pequeñas, pero sincronizan),
+   el <strong>coste de carga del dataset</strong> (constante, no paralelizado) y la fracción
+   serie (reducciones y coordinación).</li>
+<li><strong>Impacto de las comunicaciones.</strong> En <code>test</code>/<code>k</code>/<code>folds</code> las comunicaciones se
+   reducen a un <code>MPI_Allreduce</code> de unos pocos valores por fase → <strong>despreciable</strong>
+   frente al cómputo; el rendimiento está dominado por el trabajo de distancias.
+   En <code>spec</code> hay además mensajería punto a punto de control y posible
+   <strong>trabajo descartado</strong> (invalidaciones).</li>
+<li><strong>Comparación de estrategias.</strong> <code>test</code> es la más general y con mejor
+    escalabilidad (hay muchas muestras → reparto fino). <code>k</code> y <code>folds</code> tienen
+    paralelismo limitado por el nº de tareas (grano grueso). <code>spec</code> solapa las dos
+    fases del algoritmo y sólo compensa cuando el fine-tuning y la evaluación son
+    costosos y el mejor K se estabiliza pronto (ver discusión y figura).</li>
+<li><strong>Ganancia máxima teórica.</strong> Limitada por la <strong>ley de Amdahl</strong>: la fracción
+    serie (carga de datos, reducciones) acota el speed-up; dentro de la parte
+    paralela, el máximo es el nº de tareas independientes (P para <code>test</code>).</li>
+<li><strong>Eficiencia secuencial vs paralela.</strong> La versión paralela mejora al
+    secuencial desde P≥2. A P=1 la versión por índices queda <strong>a la par</strong> del
+    código original (<code>test</code> P=1 ≈ <code>seq</code>): en estas configuraciones reducidas la
+    eliminación de las copias de <code>TSample</code> se compensa con el coste de construir y
+    ordenar el vector de vecinos. Ahora bien, en el <strong>perfil completo</strong> (train =
+    20 000) las copias suponían el <strong>23 %</strong> del tiempo, por lo que la evaluación
+    por índices es una optimización relevante a mayor escala.</li>
+</ol>
+<h3 id="75-analisis-del-modo-especulativo">7.5 Análisis del modo especulativo</h3>
+<p>Reparto de grupos en el modo <code>spec</code> (<code>P=8</code>, <code>train=4000</code>, base secuencial 19.73 s):</p>
+<table>
+<thead>
+<tr>
+<th>Grupo A (fine-tuning)</th>
+<th>Grupo B (evaluación)</th>
+<th>tTotal (s)</th>
+<th>Speed-up</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>7</td>
+<td>19.84</td>
+<td>0.99</td>
+</tr>
+<tr>
+<td>2</td>
+<td>6</td>
+<td>12.14</td>
+<td>1.63</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4</td>
+<td>8.31</td>
+<td>2.37</td>
+</tr>
+<tr>
+<td>6</td>
+<td>2</td>
+<td><strong>4.36</strong></td>
+<td><strong>4.53</strong></td>
+</tr>
+</tbody>
+</table>
+<p>En el modo <code>spec</code> se aprecia el compromiso del paralelismo funcional: cuantos
+más procesos se dedican al <strong>grupo A</strong> (fine-tuning), más rápido termina éste
+pero menos procesos quedan para la evaluación final (grupo B), y viceversa. Como
+en este problema el <strong>fine-tuning es la fase dominante</strong> (≈5× más costosa que la
+evaluación final con estos tamaños), el reparto que mejor funciona es el que
+<strong>da más peso al grupo A</strong>; en cambio, si ambas fases tuvieran coste similar, un
+reparto equilibrado solaparía mejor. Si el mejor <code>K</code> se descubre pronto y ya no
+cambia, el grupo B no descarta trabajo; si cambia tarde, las <strong>invalidaciones</strong>
+(descartar y reiniciar la evaluación) reducen o anulan la ventaja. Este modo es,
+por tanto, ventajoso cuando la fase de evaluación es <strong>comparable o mayor</strong> que
+la de ajuste y el óptimo se estabiliza pronto.</p>
+<h3 id="76-tipos-de-paralelismo-modelo-estilo-y-estructura-unidad-3">7.6 Tipos de paralelismo, modelo, estilo y estructura (Unidad 3)</h3>
+<ul>
+<li><strong>Tipos de paralelismo explotados:</strong></li>
+<li><strong>Paralelismo de datos</strong> (<code>test</code>): la misma operación (clasificar una muestra)
+    se aplica a un conjunto de datos particionado entre procesos. También se
+    explota a bajo nivel dentro de la distancia euclídea.</li>
+<li><strong>Paralelismo de tareas</strong> (<code>k</code>, <code>folds</code>): tareas <strong>independientes</strong> (distintos
+    valores de <code>K</code>, distintos folds) repartidas entre procesos.</li>
+<li><strong>Paralelismo funcional</strong> (<code>spec</code>): dos <strong>fases distintas</strong> del algoritmo
+    (ajuste de <code>K</code> y evaluación final) se ejecutan concurrentemente en grupos de
+    procesos, con ejecución <strong>especulativa</strong> e invalidación.</li>
+<li>Paralelismo de <strong>réplica/redundancia controlada</strong>: los datos inmutables
+    (dataset, etiquetas) se replican en todos los procesos para evitar
+    comunicarlos; sólo se comunican resultados agregados.</li>
+<li><strong>Modelo de programación:</strong> <strong>paso de mensajes</strong> (memoria distribuida) con
+  <strong>SPMD</strong> (Single Program, Multiple Data): todos los procesos ejecutan el mismo
+  programa y se diferencian por su <code>rank</code>.</li>
+<li><strong>Mecanismos de comunicación:</strong></li>
+<li><strong>Colectivas:</strong> <code>MPI_Allreduce</code> (combinar aciertos/accuracies), <code>MPI_Bcast</code>
+    (difundir el mejor <code>K</code>), <code>MPI_Comm_split</code> (crear grupos A/B).</li>
+<li><strong>Punto a punto:</strong> <code>MPI_Send</code>/<code>MPI_Recv</code> y sondeo no bloqueante <code>MPI_Iprobe</code>
+    para las notificaciones de mejor <code>K</code> y la señal de fin (modo <code>spec</code>).</li>
+<li><strong>Estilo:</strong> de <strong>grano grueso</strong> (cada mensaje transporta poco volumen y el
+  cómputo asociado es grande) y <strong>descomposición de dominio</strong> para <code>test</code>; el modo
+  <code>spec</code> es un esquema <strong>productor–consumidor</strong> entre grupos.</li>
+<li><strong>Estructura:</strong> estructura <strong>SPMD con partición de grupos</strong> para <code>spec</code>
+  (maestro/coordinador = rank 0 en el grupo A) y estructura <strong>SPMD simétrica</strong> con
+  reducciones para <code>test</code>/<code>k</code>/<code>folds</code>.</li>
+<li><strong>Reparto de datos y tareas y reducción de comunicaciones:</strong> se reparten
+  <strong>muestras</strong> (datos) o <strong>valores de K / folds</strong> (tareas) por bloques contiguos;
+  los datos inmutables se replican; sólo se envían <strong>contadores</strong> (nº de aciertos)
+  o <strong>el mejor K</strong>, de modo que el <strong>volumen de comunicación es mínimo</strong> (unos
+  pocos bytes por fase) y nunca se transmite el dataset.</li>
+</ul>
+<hr />
+<h2 id="8-conclusiones">8. Conclusiones</h2>
+<ul>
+<li>El <strong>análisis con gprof</strong> identifica correctamente los cuellos de botella
+  (<code>compute_forces</code> en N cuerpos; <code>euclidean</code> + copias en kNN) y guía las
+  decisiones de paralelización.</li>
+<li>La <strong>descomposición de datos</strong> con comunicación colectiva (<code>MPI_Allgatherv</code>,
+  <code>MPI_Allreduce</code>) da escalabilidad casi lineal cuando la razón
+  cómputo/comunicación es favorable.</li>
+<li>El <strong>paralelismo de tareas</strong> (K, folds) es sencillo pero limitado por el número
+  de tareas independientes.</li>
+<li>El <strong>paralelismo funcional con ejecución especulativa</strong> es viable mediante
+  mensajería punto a punto + sondeo (<code>MPI_Iprobe</code>); su rentabilidad depende de que
+  el valor óptimo de K se descubra pronto (poco trabajo descartado).</li>
+<li>Además del paralelismo, <strong>eliminar copias de datos</strong> (evaluación por índices)
+  es una optimización secuencial que se vuelve relevante a mayor escala (en el
+  perfil completo las copias de <code>TSample</code> suponían el 23 % del tiempo a <code>-O2</code>).</li>
+</ul>
+<h2 id="9-reproducibilidad">9. Reproducibilidad</h2>
+<p>Todo se reproduce con:</p>
+<pre><code class="language-bash">cd p3
+./scripts/run_all.sh
+</code></pre>
+<ul>
+<li>Resultados numéricos → <code>p3/results/*.csv</code>.</li>
+<li>Figuras → <code>p3/figures/*.png</code>.</li>
+<li>Informes de gprof → <code>p3/tarea1_profiling/**/perfil_*.txt</code>.</li>
+<li>Código: <code>p3/tarea0/</code>, <code>p3/tarea2_mpi/</code>, <code>p3/tarea3_nbody/</code>,
+  <code>p3/tarea4_knn/</code>.</li>
+</ul>
+<h2 id="10-originalidad-y-uso-de-fuentes">10. Originalidad y uso de fuentes</h2>
+<p>El código secuencial de partida (<code>src/main.cpp</code> de la práctica anterior y el
+proyecto <code>knn2</code>) es material proporcionado por el profesorado. Las versiones
+paralelas con MPI (<code>nbody_mpi.cpp</code>, <code>knn_mpi.cpp</code>), los micro-benchmarks, los
+scripts de experimentación/figuras y esta memoria son de elaboración propia. Se
+ha respetado la semántica del código original para que los resultados sean
+comparables (verificado numéricamente).</p></body></html>

@@ -1,0 +1,3 @@
+# hostfile.local - un unico nodo (esta maquina) con 16 slots.
+# Util para depurar el codigo MPI antes de lanzarlo en el cluster real.
+localhost slots=16
