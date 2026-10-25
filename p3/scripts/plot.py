@@ -1,18 +1,32 @@
 #!/usr/bin/env python3
 """Genera las figuras de la memoria a partir de los CSV en results/."""
-import csv, os
+import argparse
+import csv
+import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RES = os.path.join(ROOT, "results")
-FIG = os.path.join(ROOT, "figures")
+
+_ap = argparse.ArgumentParser(description="Figuras de la Practica 3")
+_ap.add_argument("--results", default=os.path.join(ROOT, "results"),
+                 help="directorio con los CSV (p.ej. results/cluster)")
+_ap.add_argument("--figures", default=os.path.join(ROOT, "figures"),
+                 help="directorio de salida de las figuras")
+_args = _ap.parse_args()
+
+RES = _args.results
+FIG = _args.figures
 os.makedirs(FIG, exist_ok=True)
 
 
 def read(name):
-    with open(os.path.join(RES, name)) as f:
+    path = os.path.join(RES, name)
+    if not os.path.exists(path):
+        print(f"aviso: no existe {path} -> se omite esa parte de las figuras")
+        return []
+    with open(path) as f:
         return list(csv.DictReader(f))
 
 
@@ -20,6 +34,8 @@ def read(name):
 def tarea0():
     v = read("tarea0_vector.csv")
     m = read("tarea0_matrix.csv")
+    if not v or not m:
+        return
     fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
 
     sizes = [int(r["size"]) for r in v]
@@ -55,6 +71,8 @@ def tarea0():
 def tarea3():
     seq = {int(r["n"]): float(r["wall"]) for r in read("tarea3_seq.csv")}
     rows = read("tarea3_nbody.csv")
+    if not seq or not rows:
+        return
     ns = sorted({int(r["n"]) for r in rows})
     fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
     for part, style in [("block", "-o"), ("cyclic", "--s")]:
@@ -92,6 +110,8 @@ def tarea3():
 # ---------- Tarea 4 ----------
 def tarea4():
     rows = read("tarea4_knn.csv")
+    if not rows:
+        return
     for r in rows:
         for k in ["P", "train", "test", "bestK", "groupA"]:
             r[k] = int(r[k])
@@ -132,8 +152,10 @@ def tarea4():
         fig.savefig(os.path.join(FIG, f"fig_tarea4_speedup_train{tr}.png"), dpi=130)
         plt.close(fig)
 
-    # reparto de grupos en modo especulativo (P=8, train=4000)
-    allp = sorted([r for r in rows if r["strategy"] == "spec" and r["P"] == 8
+    # reparto de grupos en modo especulativo (P maximo con train=4000)
+    spec_P = max([r["P"] for r in rows
+                  if r["strategy"] == "spec" and r["train"] == 4000] or [0])
+    allp = sorted([r for r in rows if r["strategy"] == "spec" and r["P"] == spec_P
                    and r["train"] == 4000], key=lambda r: r["groupA"])
     seen = set(); pts = []
     for r in allp:
@@ -145,7 +167,7 @@ def tarea4():
         ax.bar([str(r["groupA"]) for r in pts], [r["tTotal"] for r in pts], color="C3")
         ax.set_xlabel("tamano del grupo A (fine-tuning)")
         ax.set_ylabel("tiempo total (s)")
-        ax.set_title("kNN especulativo (P=8): reparto de grupos")
+        ax.set_title(f"kNN especulativo (P={spec_P}): reparto de grupos")
         ax.grid(axis="y", alpha=0.3)
         fig.tight_layout(); fig.savefig(os.path.join(FIG, "fig_tarea4_spec_groups.png"), dpi=130)
         plt.close(fig)

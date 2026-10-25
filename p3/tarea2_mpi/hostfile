@@ -1,8 +1,9 @@
 # hostfile - plantilla para el multicomputador del laboratorio.
-# Una linea por nodo (nombre o IP). Copiar a todas las maquinas en el mismo
-# directorio de trabajo y dar permisos: chmod 600 hostfile
+# Una linea por nodo (nombre o IP) con sus slots (nucleos fisicos).
+# En la version automatizada NO se edita este fichero: scripts/cluster_setup.sh
+# genera p3/hostfile a partir de NODES y SLOTS_PER_NODE (scripts/cluster.env).
 #
-# Sustituir por las IPs/nombres reales de vuestros nodos, p. ej.:
-# 192.168.1.10
-# 192.168.1.11
-# 192.168.1.12
+# Ejemplo:
+# 192.168.1.10 slots=4
+# 192.168.1.11 slots=4
+# 192.168.1.12 slots=4

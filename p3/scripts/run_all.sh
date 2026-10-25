@@ -10,14 +10,8 @@ cd -- "$(dirname -- "$0")/.."          # p3/
 ROOT=$PWD
 K="$(cd "$ROOT/../knn2" && pwd)"
 
-echo "== Compilando =="
-( cd tarea2_mpi && mpicc -O2 hello_mpi.c -o hello_mpi )
-( cd tarea3_nbody && mpic++ -O2 -std=c++17 nbody_mpi.cpp -o nbody_mpi \
-    && g++ -O2 -std=c++17 ../../src/main.cpp -o nbody_seq )
-( cd tarea4_knn && mpic++ -O2 -std=c++17 -I"$K" knn_mpi.cpp \
-    "$K/crossValidation.cc" "$K/mnist.cc" "$K/knn.cc" "$K/sample.cc" -o knn_mpi \
-    && g++ -O2 -std=c++17 -I"$K" seq_knn.cpp \
-    "$K/crossValidation.cc" "$K/mnist.cc" "$K/knn.cc" "$K/sample.cc" -o seq_knn )
+echo "== Compilando (scripts/build_all.sh) =="
+bash scripts/build_all.sh
 
 echo "== Tarea 1: gprof =="
 bash scripts/run_tarea1.sh

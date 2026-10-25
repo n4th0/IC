@@ -229,3 +229,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .DS_Store
+
+# Practica 3 - cluster
+p3/scripts/cluster.env
+p3/hostfile
+p3/results/cluster/
+p3/results/cluster_rehearsal/
+__pycache__/
+*.pyc

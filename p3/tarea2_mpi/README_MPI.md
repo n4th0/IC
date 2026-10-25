@@ -3,6 +3,20 @@
 Objetivo: ejecutar el "hola mundo" paralelo (`hello_mpi.c`) sobre varios nodos
 de un multicomputador, segun los pasos de la guia de la Practica 3.
 
+> **Version automatizada (recomendada):** toda la preparacion (claves SSH,
+> hostfile, copia a los nodos y compilacion) y el lanzamiento estan en
+> `../scripts/cluster_setup.sh` y `../scripts/run_cluster.sh`.
+> Guia completa: [`../docs/CLUSTER.md`](../docs/CLUSTER.md).
+>
+> ```bash
+> cd ..
+> ./scripts/cluster_setup.sh          # una sola vez
+> ./scripts/run_cluster.sh --tarea 2  # hola mundo en los 3 PCs
+> ```
+>
+> El resto de este documento describe el procedimiento manual.
+
+
 ## 1. Requisitos previos
 
 Instalar una implementacion de MPI (Open MPI) y su compilador:
@@ -28,11 +42,14 @@ Fichero de texto plano con el nombre o la IP de cada nodo, uno por linea. Se usa
 `hostfile` (incluido) como plantilla:
 
 ```
-# hostfile  ->  una linea por nodo (IP o nombre)
-192.168.1.10
-192.168.1.11
-192.168.1.12
+# hostfile  ->  una linea por nodo con sus slots (nucleos fisicos)
+192.168.1.10 slots=4
+192.168.1.11 slots=4
+192.168.1.12 slots=4
 ```
+
+> En la version automatizada este fichero lo genera `scripts/cluster_setup.sh`
+> a partir de `scripts/cluster.env`: **no lo edites a mano**.
 
 Para pruebas locales (una sola maquina) se puede usar `hostfile.local`:
 

@@ -23,7 +23,7 @@ p3/
 - Python 3 con `matplotlib` y `numpy` (figuras) y `markdown` (PDF).
 - Dataset MNIST en `knn2/build/{train,test}` (`knn2/get_dataset.sh`).
 
-## Reproducir todos los experimentos
+## Reproducir todos los experimentos (un solo PC)
 
 ```bash
 cd p3
@@ -31,6 +31,42 @@ cd p3
 ```
 
 Genera `results/*.csv`, `figures/*.png` e informes de gprof en `tarea1_profiling/`.
+
+## Ejecutar en varios PCs (cluster MPI)
+
+La practica debe ejecutarse en un multicomputador de **al menos 3 PCs**. Todo
+esta automatizado; la guia completa paso a paso esta en
+**[`docs/CLUSTER.md`](docs/CLUSTER.md)**.
+
+1. Edita **solo** `scripts/cluster.env` (IPs, usuario, directorio y nucleos):
+
+   ```bash
+   cp scripts/cluster.env.example scripts/cluster.env
+   nano scripts/cluster.env      # NODES=(111.111.111.111 222.222.222.222 333.333.333.333)
+   ```
+
+2. Prepara el cluster (claves SSH, hostfile, copia del codigo/dataset, build):
+
+   ```bash
+   ./scripts/cluster_setup.sh
+   ```
+
+3. Lanza las tareas:
+
+   ```bash
+   ./scripts/run_cluster.sh --tarea 2     # hola mundo en los 3 PCs
+   ./scripts/run_cluster.sh               # tareas 2 + 3 + 4
+   ```
+
+   Resultados en `results/cluster/` y figuras con
+   `python3 scripts/plot.py --results results/cluster`.
+
+4. Ensayo en un solo PC antes de ir al laboratorio:
+
+   ```bash
+   ./scripts/run_cluster.sh --rehearsal --quick
+   ```
+
 
 ## Memoria a PDF
 
