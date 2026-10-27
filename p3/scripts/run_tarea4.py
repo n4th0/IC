@@ -20,7 +20,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mpi_common import add_cluster_args, mpirun_cmd, parse_np_list  # noqa: E402
+from mpi_common import add_cluster_args, mpiexec_cmd, parse_np_list  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 K = os.path.join(os.path.dirname(ROOT), "knn2")
@@ -124,8 +124,8 @@ def main():
                 ga = max(1, P // 2) if strat == "spec" else -1
                 if strat == "spec" and ga >= P:
                     ga = P - 1
-                cmd = mpirun_cmd(P, args.hostfile, args.mpirun_extra,
-                                 args.map_by, args.bind_to, args.net_iface)
+                cmd = mpiexec_cmd(P, args.hostfile, args.mpiexec_extra,
+                                  args.map_by, args.bind_to, args.net_iface)
                 cmd += [os.path.join(D, "knn_mpi"), "--strategy", strat,
                         "--train", str(tr), "--test", str(args.test),
                         "--finaltrain", str(args.finaltrain),
@@ -147,8 +147,8 @@ def main():
             for ga in [1, 2, 4, 6]:
                 if ga >= P:
                     continue
-                cmd = mpirun_cmd(P, args.hostfile, args.mpirun_extra,
-                                 args.map_by, args.bind_to, args.net_iface)
+                cmd = mpiexec_cmd(P, args.hostfile, args.mpiexec_extra,
+                                  args.map_by, args.bind_to, args.net_iface)
                 cmd += [os.path.join(D, "knn_mpi"), "--strategy", "spec",
                         "--groupA", str(ga), "--train", str(tr),
                         "--test", str(args.test),

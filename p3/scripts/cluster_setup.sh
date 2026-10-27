@@ -68,11 +68,11 @@ fi
 # 1. Herramientas locales
 # ---------------------------------------------------------------------------
 log "1/7 comprobando herramientas locales"
-for t in mpirun mpicc mpic++ g++ ssh tar; do
+for t in mpiexec mpicc mpic++ g++ ssh tar; do
     command -v "$t" >/dev/null 2>&1 || die "falta '$t'. Instala Open MPI y las herramientas de compilacion:
     sudo apt update && sudo apt install -y openmpi-bin libopenmpi-dev build-essential"
 done
-LOCAL_MPI_VERSION="$(mpirun --version 2>&1 | head -n1)"
+LOCAL_MPI_VERSION="$(mpiexec --version 2>&1 | head -n1)"
 ok "$LOCAL_MPI_VERSION"
 
 # ---------------------------------------------------------------------------
@@ -140,11 +140,11 @@ for n in "${NODES[@]}"; do
     elif (( DRY_RUN )); then
         v="(se comprobara en la ejecucion real)"
     else
-        if ! remote "$n" "command -v mpirun >/dev/null && command -v mpic++ >/dev/null"; then
+        if ! remote "$n" "command -v mpiexec >/dev/null && command -v mpic++ >/dev/null"; then
             die "en $n falta Open MPI. Ejecuta alli:
     sudo apt update && sudo apt install -y openmpi-bin libopenmpi-dev"
         fi
-        v="$(remote "$n" "mpirun --version 2>&1 | head -n1")"
+        v="$(remote "$n" "mpiexec --version 2>&1 | head -n1")"
     fi
     versions+=("$v")
     ok "$n -> $v"

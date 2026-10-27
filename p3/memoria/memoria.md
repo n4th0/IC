@@ -42,9 +42,9 @@ distribuida de la Tarea 2, cuyo procedimiento para el clúster real se documenta
 > **Nota sobre el clúster.** La guía pide desarrollar la práctica sobre un
 > multicomputador de **al menos 3 computadores**. Por disponibilidad de recursos,
 > el desarrollo y la toma de medidas se han hecho sobre un único nodo lanzando
-> `mpirun` con varios procesos (memoria compartida emulando paso de mensajes,
+> `mpiexec` con varios procesos (memoria compartida emulando paso de mensajes,
 > que es el mismo modelo de programación MPI). En la Tarea 2 se documenta el
-> procedimiento completo (hostfile, certificado SSH y orden `mpirun`) para
+> procedimiento completo (hostfile, certificado SSH y orden `mpiexec`) para
 > trasladarlo al clúster del laboratorio. Los *aspectos algorítmicos* medidos
 > (comportamiento de las comunicaciones colectivas, balance de carga, coste de
 > sincronización) no dependen de si los procesos residen en la misma máquina,
@@ -218,14 +218,17 @@ Procedimiento (detallado en `p3/tarea2_mpi/README_MPI.md`):
 1. Instalar Open MPI (`sudo apt install openmpi-bin libopenmpi-dev`).
 2. Compilar: `mpicc hello_mpi.c -o hello_mpi`.
 3. Mismo usuario, mismo directorio (`$HOME`) y mismo ejecutable en todos los nodos.
-4. Crear `hostfile` con la IP/nombre de cada nodo (plantilla en
-   `p3/tarea2_mpi/hostfile`); `chmod 600 hostfile`.
+4. Crear `hostfile` con una línea por nodo en formato Open MPI
+   `ip slots=N` (plantilla en `p3/tarea2_mpi/hostfile`); `chmod 600 hostfile`.
 5. Certificado SSH: `ssh-keygen -t rsa` y copiar `~/.ssh/id_rsa.pub` a
    `~/.ssh/authorized_keys` de los demás nodos.
 6. `chmod o+x hello_mpi` y ejecutar:
 
 ```bash
-mpirun -mca plm_rsh_no_tree_spawn 1 -hostfile hostfile -n 6 ./hello_mpi
+mpiexec --hostfile hostfile \
+        --mca btl_tcp_if_include enp4s0 \
+        --mca oob_tcp_if_include enp4s0 \
+        -np 6 ./hello_mpi
 ```
 
 ### 5.3 Resultado observado (ejecución local, 4 procesos)
@@ -242,7 +245,7 @@ mpirun -mca plm_rsh_no_tree_spawn 1 -hostfile hostfile -n 6 ./hello_mpi
 
 Se observa que cada proceso se reparte por núcleos distintos y que el proceso de
 rango 2 ejecuta su rama específica. (El `PID` coincide porque `getppid()` devuelve
-el proceso `mpirun` padre.)
+el proceso `mpiexec` padre.)
 
 ---
 

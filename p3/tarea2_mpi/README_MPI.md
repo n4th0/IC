@@ -19,11 +19,12 @@ de un multicomputador, segun los pasos de la guia de la Practica 3.
 
 ## 1. Requisitos previos
 
-Instalar una implementacion de MPI (Open MPI) y su compilador:
+Instalar una implementacion de MPI (Open MPI) y su compilador. En este repo
+se usa Open MPI; `mpiexec` y `mpirun` son equivalentes:
 
 ```bash
 sudo apt update && sudo apt install -y openmpi-bin libopenmpi-dev
-mpirun --version
+mpiexec --version
 ```
 
 ## 2. Compilacion
@@ -38,8 +39,9 @@ las maquinas.
 
 ## 3. Archivo de hosts
 
-Fichero de texto plano con el nombre o la IP de cada nodo, uno por linea. Se usa
-`hostfile` (incluido) como plantilla:
+Fichero de texto plano con el nombre o la IP de cada nodo y sus slots (nucleos
+fisicos). El formato de Open MPI es `ip slots=N` (no `ip:N`, que es de
+MPICH/Hydra). Se usa `hostfile` (incluido) como plantilla:
 
 ```
 # hostfile  ->  una linea por nodo con sus slots (nucleos fisicos)
@@ -87,12 +89,21 @@ ssh <nodo> hostname
 Desde la maquina donde se creo el certificado:
 
 ```bash
-mpirun -mca plm_rsh_no_tree_spawn 1 -hostfile hostfile -n 6 ./hello_mpi
+mpiexec --hostfile hostfile \
+        --mca btl_tcp_if_include enp4s0 \
+        --mca oob_tcp_if_include enp4s0 \
+        -np 6 ./hello_mpi
 ```
 
-- `-mca plm_rsh_no_tree_spawn 1` evita que Open MPI use el "tree spawn" al lanzar
-  por SSH (recomendado en la guia).
-- `-n <N>` numero total de procesos MPI.
+- `--hostfile hostfile` indica los nodos y sus slots.
+- `--mca btl_tcp_if_include` y `--mca oob_tcp_if_include` fijan la interfaz de
+  red del cluster (ajusta `enp4s0` a la de tus PCs). Si se omiten, Open MPI
+  elige la interfaz automaticamente.
+- `-np <N>` numero total de procesos MPI.
+
+> `-mca plm_rsh_no_tree_spawn 1` era necesario en versiones antiguas de Open
+> MPI; con Open MPI 5 (PRRTE) ya no se usa. Las opciones `-iface`, `-f` y el
+> hostfile `ip:N` son sintaxis de MPICH/Hydra.
 
 ### Prueba local (una sola maquina)
 

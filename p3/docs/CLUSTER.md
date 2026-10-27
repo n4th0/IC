@@ -9,7 +9,7 @@ se explica qué hace cada uno para poder defenderlo en la memoria.
         PC1 (maestro)                PC2                     PC3
      111.111.111.111           222.222.222.222         333.333.333.333
    +----------------+        +----------------+      +----------------+
-   |  mpirun        |--ssh-->|  proceso MPI   |      |  proceso MPI   |
+   |  mpiexec       |--ssh-->|  proceso MPI   |      |  proceso MPI   |
    |  proceso MPI   |--ssh-->|  proceso MPI   |----->|  proceso MPI   |
    |  proceso MPI   |        |  proceso MPI   |      |  proceso MPI   |
    +----------------+        +----------------+      +----------------+
@@ -36,7 +36,7 @@ nano p3/scripts/cluster.env      # o el editor que prefieras
 Y se edita **solo esto**:
 
 ```bash
-# Las 3 IPs de vuestros PCs. El PRIMERO es el maestro (aquí se lanza mpirun).
+# Las 3 IPs de vuestros PCs. El PRIMERO es el maestro (aquí se lanza mpiexec).
 NODES=(111.111.111.111 222.222.222.222 333.333.333.333)
 
 SSH_USER="${USER}"          # mismo usuario en los 3 PCs
@@ -44,11 +44,12 @@ WORKDIR="${HOME}/IC"        # MISMA ruta en los 3 PCs (aquí está el repo)
 SLOTS_PER_NODE=4            # núcleos FÍSICOS de cada PC
 
 SYNC_MODE=auto              # auto | nfs | copy
-NET_IFACE=""                # solo si mpirun elige la interfaz de red equivocada
+NET_IFACE="enp4s0"          # interfaz de red del clúster (eth0, enp3s0...)
 ```
 
 > **No se edita el hostfile a mano.** `cluster_setup.sh` lo genera a partir de
-> `NODES` y `SLOTS_PER_NODE` en `p3/hostfile`.
+> `NODES` y `SLOTS_PER_NODE` en `p3/hostfile`, con el formato de Open MPI:
+> `111.111.111.111 slots=4` (una línea por nodo).
 >
 > Si usáis **nombres** en lugar de IPs (`pc1`, `pc2`, `pc3`), añadidlos a
 > `/etc/hosts` en los tres PCs:
@@ -72,7 +73,7 @@ Instalación (en **cada** PC):
 ```bash
 sudo apt update
 sudo apt install -y openmpi-bin libopenmpi-dev build-essential rsync
-mpirun --version        # debe ser la MISMA versión en los 3
+mpiexec --version       # debe ser la MISMA versión en los 3
 ```
 
 Comprobación de red (desde el maestro):
@@ -119,7 +120,7 @@ chmod a+x get_dataset.sh
 
 ## 3. Claves SSH sin contraseña
 
-`mpirun` lanza procesos remotos por SSH; debe poder entrar **sin contraseña**.
+`mpiexec` lanza procesos remotos por SSH; debe poder entrar **sin contraseña**.
 La guía pide hacerlo a mano; los pasos son:
 
 ### 3.1 Manualmente (lo que pide el enunciado)
@@ -170,14 +171,14 @@ cd ~/IC/p3
 
 El script, en orden:
 
-1. Comprueba `mpirun`, `mpicc`, `g++`, `ssh` y `tar` en el maestro.
+1. Comprueba `mpiexec`, `mpicc`, `g++`, `ssh` y `tar` en el maestro.
 2. Verifica (y crea si hace falta) el acceso SSH sin contraseña a los 3 PCs.
 3. Comprueba que Open MPI está instalado y es **la misma versión** en los 3.
 4. Detecta si `$WORKDIR` es compartido:
    - **NFS**: no copia nada.
    - **discos separados**: copia el repo y el dataset MNIST por SSH
      (`tar | ssh`) a cada PC.
-5. Genera `p3/hostfile` con `slots=N` por nodo y permisos `600`.
+5. Genera `p3/hostfile` con `ip slots=N` por nodo y permisos `600`.
 6. Compila `hello_mpi`, `nbody_mpi`, `knn_mpi` y las versiones secuenciales
    (`p3/scripts/build_all.sh`).
 7. Verifica en cada PC que existen los ejecutables y el dataset.
@@ -188,9 +189,9 @@ Ejemplo de salida correcta:
 [  ok  ] ssh usuario@111.111.111.111
 [  ok  ] ssh usuario@222.222.222.222
 [  ok  ] ssh usuario@333.333.333.333
-[  ok  ] 111.111.111.111 -> mpirun (Open MPI) 5.0.7
-[  ok  ] 222.222.222.222 -> mpirun (Open MPI) 5.0.7
-[  ok  ] 333.333.333.333 -> mpirun (Open MPI) 5.0.7
+[  ok  ] 111.111.111.111 -> mpiexec (Open MPI) 5.0.7
+[  ok  ] 222.222.222.222 -> mpiexec (Open MPI) 5.0.7
+[  ok  ] 333.333.333.333 -> mpiexec (Open MPI) 5.0.7
 [cluster] modo de sincronizacion: nfs
 [  ok  ] hostfile creado (chmod 600)
 [  ok  ] 222.222.222.222 -> ejecutables y dataset OK
@@ -216,11 +217,17 @@ Equivale a:
 
 ```bash
 cd tarea2_mpi
-mpirun -mca plm_rsh_no_tree_spawn 1 \
-       -hostfile ../hostfile \
-       --map-by node \
-       -np 6 ./hello_mpi
+mpiexec --hostfile ../hostfile \
+        --mca btl_tcp_if_include enp4s0 \
+        --mca oob_tcp_if_include enp4s0 \
+        --map-by node \
+        -np 6 ./hello_mpi
 ```
+
+> `NET_IFACE=enp4s0` se traduce en los dos `--mca ..._if_include`; si se deja
+> vacío, Open MPI elige la interfaz automáticamente. El hostfile debe usar
+> `ip slots=N`; las opciones `-iface`, `-f` y el formato `ip:N` son de
+> MPICH/Hydra, no de Open MPI.
 
 Salida esperada (fijaos en el **nombre de la máquina**, que debe cambiar):
 
@@ -308,11 +315,13 @@ ejecutables y CSVs.
 |---|---|
 | `Permission denied (publickey)` | La clave no está en `~/.ssh/authorized_keys` del nodo. Repite el paso 3 y comprueba `chmod 700 ~/.ssh`, `chmod 600 ~/.ssh/authorized_keys`. |
 | `Host key verification failed` | `ssh-keygen -R <ip>` y vuelve a conectar, o usa `StrictHostKeyChecking=accept-new` (ya lo hace el script). |
-| `mpirun was unable to launch` | El ejecutable no existe en esa ruta del nodo, o no tiene permiso: `chmod o+x programa`. |
+| `mpiexec was unable to launch` | El ejecutable no existe en esa ruta del nodo, o no tiene permiso: `chmod o+x programa`. |
 | `not enough slots available` | Pides más procesos que `NODES × SLOTS_PER_NODE`. Sube `SLOTS_PER_NODE` o baja `-np`. |
 | `mca_base_component_repository_open` / versiones | Open MPI distinto en los nodos. Instala la **misma** versión en los 3. |
 | Se queda colgado al arrancar | Cortafuegos. Abre los puertos TCP entre nodos (Open MPI usa 1024-65535). |
-| `No route to host` / elige la interfaz equivocada | Pon `NET_IFACE=eth0` (o `enp3s0`, `wlan0`...) en `cluster.env`. |
+| `No route to host` / elige la interfaz equivocada | Pon `NET_IFACE=enp4s0` (o `eth0`, `enp3s0`, `wlan0`...) en `cluster.env`. |
+| `Option: --iface` o `Option: -f` no reconocida | Son opciones de MPICH/Hydra. En Open MPI usa `--mca btl_tcp_if_include <iface> --mca oob_tcp_if_include <iface>` y `--hostfile`. |
+| El hostfile con `ip:N` no reparte bien los slots | Open MPI espera `ip slots=N`; `ip:N` es formato de MPICH/Hydra. |
 | `train/train-images-idx3-ubyte` no encontrado | Falta el dataset en ese nodo: `knn2/get_dataset.sh` o `SYNC_MODE=copy`. |
 | `WORKDIR (...) debe coincidir...` | El repo no está en la ruta de `WORKDIR`. Clónalo ahí o cambia `WORKDIR`. |
 | Funciona con `-np 3` pero no con `-np 6` | Hostfile con `slots=1` por defecto: revisa `SLOTS_PER_NODE`. |
@@ -320,7 +329,7 @@ ejecutables y CSVs.
 Para depurar un fallo de lanzamiento:
 
 ```bash
-mpirun --hostfile ../hostfile -np 3 hostname
+mpiexec --hostfile ../hostfile -np 3 hostname
 ```
 
 Si eso falla, el problema es de SSH/hostfile, no de vuestro código MPI.
@@ -352,11 +361,11 @@ Con los datos de `results/cluster/`:
 | `scripts/cluster.env` | **Único sitio donde se editan las IPs.** |
 | `scripts/cluster.env.example` | Plantilla con IPs de ejemplo. |
 | `scripts/cluster.rehearsal.env` | Ensayo local (1 PC). |
-| `scripts/cluster_lib.sh` | Funciones comunes (SSH, hostfile, mpirun). |
+| `scripts/cluster_lib.sh` | Funciones comunes (SSH, hostfile, mpiexec). |
 | `scripts/cluster_setup.sh` | Prepara claves, sincroniza, hostfile y compila. |
 | `scripts/run_cluster.sh` | Lanza Tareas 2/3/4 en el cluster. |
 | `scripts/build_all.sh` | Compila todos los ejecutables. |
-| `scripts/mpi_common.py` | Construcción de `mpirun` y listas de P. |
+| `scripts/mpi_common.py` | Construcción de `mpiexec` y listas de P. |
 | `scripts/run_tarea3.py` | Barrido N-cuerpos (`--hostfile`). |
 | `scripts/run_tarea4.py` | Barrido kNN (`--hostfile`). |
 | `tarea2_mpi/run_cluster.sh` | Atajo para la Tarea 2. |

@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mpi_common import add_cluster_args, mpirun_cmd, parse_np_list  # noqa: E402
+from mpi_common import add_cluster_args, mpiexec_cmd, parse_np_list  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = os.path.join(ROOT, "tarea3_nbody")
@@ -68,8 +68,8 @@ def main():
     for part in parts:
         for n in ns:
             for P in ps:
-                cmd = mpirun_cmd(P, args.hostfile, args.mpirun_extra,
-                                 args.map_by, args.bind_to, args.net_iface)
+                cmd = mpiexec_cmd(P, args.hostfile, args.mpiexec_extra,
+                                  args.map_by, args.bind_to, args.net_iface)
                 cmd += [os.path.join(D, "nbody_mpi"), str(n), str(args.steps), part]
                 proc = subprocess.run(cmd, capture_output=True, text=True)
                 out = proc.stdout + proc.stderr

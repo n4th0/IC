@@ -91,7 +91,7 @@ INFO="$RESULTS_DIR/cluster_info.txt"
     echo "Slots por nodo   : $SLOTS_PER_NODE (total $TOTAL_SLOTS)"
     echo "Map-by / bind-to : $MAP_BY / $BIND_TO"
     echo "Hostfile         : $HOSTFILE"
-    echo "MPI (maestro)    : $(mpirun --version 2>&1 | head -n1)"
+    echo "MPI (maestro)    : $(mpiexec --version 2>&1 | head -n1)"
     echo
     echo "== Detalle por nodo =="
     for n in "${NODES[@]}"; do
@@ -120,9 +120,14 @@ run_tarea2() {
     local logf="$RESULTS_DIR/hello_cluster_${RUN_STAMP}.txt"
     log "TAREA 2: hola mundo con $np procesos en ${N_NODES} PC(s)"
     if (( DRY_RUN )); then
-        printf '  [dry-run] (cd %s && ' "$P3_ROOT/tarea2_mpi"
-        printf 'mpirun %s -hostfile %s --map-by %s --bind-to %s -np %s ./hello_mpi)\n' \
-            "$MPI_FLAGS" "$HOSTFILE" "$MAP_BY" "$BIND_TO" "$np"
+        printf '  [dry-run] (cd %s && mpiexec %s' \
+            "$P3_ROOT/tarea2_mpi" "$MPI_FLAGS"
+        if [[ -n "$NET_IFACE" ]]; then
+            printf ' --mca btl_tcp_if_include %s --mca oob_tcp_if_include %s' \
+                "$NET_IFACE" "$NET_IFACE"
+        fi
+        printf ' --hostfile %s --map-by %s --bind-to %s -np %s ./hello_mpi)\n' \
+            "$HOSTFILE" "$MAP_BY" "$BIND_TO" "$np"
         return
     fi
     set +e
@@ -130,10 +135,10 @@ run_tarea2() {
         cd "$P3_ROOT/tarea2_mpi"
         mpi_launch "$np" ./hello_mpi
     ) 2>&1 | tee "$logf"
-    # tee devuelve 0; el fallo real lo detecta mpirun (PIPESTATUS).
+    # tee devuelve 0; el fallo real lo detecta mpiexec (PIPESTATUS).
     local rc=${PIPESTATUS[0]}
     set -e
-    (( rc == 0 )) || die "mpirun fallo (codigo $rc); revisa $logf"
+    (( rc == 0 )) || die "mpiexec fallo (codigo $rc); revisa $logf"
 
     local nhost
     nhost=$(sed -n 's/.* on \([^ ]*\) processor [0-9]*.*/\1/p' "$logf" | sort -u | wc -l)
@@ -152,7 +157,7 @@ run_tarea2() {
 # ---------------------------------------------------------------------------
 sweep_args() {
     local -a a=(--hostfile "$HOSTFILE" --results-dir "$RESULTS_DIR"
-                --mpirun-extra="$MPI_FLAGS" --map-by "$MAP_BY"
+                --mpiexec-extra="$MPI_FLAGS" --map-by "$MAP_BY"
                 --bind-to "$BIND_TO")
     [[ -n "$NET_IFACE" ]] && a+=(--net-iface "$NET_IFACE")
     [[ -n "$PS" ]] && a+=(--np-list "$PS")

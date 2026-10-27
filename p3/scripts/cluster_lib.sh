@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # cluster_lib.sh - Utilidades comunes para lanzar la Practica 3 en un
-# multicomputador (varios PCs) con Open MPI.
+# multicomputador (varios PCs) con Open MPI y mpiexec.
 #
 # Lo usan cluster_setup.sh y run_cluster.sh. No se ejecuta directamente.
 
@@ -43,7 +43,7 @@ load_config() {
     SSH_USER="${SSH_USER:-$USER}"
     WORKDIR="${WORKDIR:-$HOME/IC}"
     SLOTS_PER_NODE="${SLOTS_PER_NODE:-4}"
-    MPI_FLAGS="${MPI_FLAGS:--mca plm_rsh_no_tree_spawn 1}"
+    MPI_FLAGS="${MPI_FLAGS:-}"
     MAP_BY="${MAP_BY:-node}"
     BIND_TO="${BIND_TO:-core}"
     SYNC_MODE="${SYNC_MODE:-auto}"
@@ -51,6 +51,7 @@ load_config() {
     HOSTFILE="${HOSTFILE:-$P3_ROOT/hostfile}"
     NET_IFACE="${NET_IFACE:-}"
     USE_SSH="${USE_SSH:-1}"
+    MPIEXEC="${MPIEXEC:-mpiexec}"
 
     N_NODES=${#NODES[@]}
     TOTAL_SLOTS=$(( N_NODES * SLOTS_PER_NODE ))
@@ -77,6 +78,7 @@ generate_hostfile() {
     mkdir -p "$(dirname -- "$out")"
     {
         echo "# Hostfile generado por cluster_setup.sh - NO editar a mano."
+        echo "# Formato Open MPI: <ip> slots=<nucleos>."
         echo "# Edita NODES y SLOTS_PER_NODE en scripts/cluster.env y reejecuta."
         echo "# Generado: $(date -Is)"
         local n
@@ -110,7 +112,7 @@ workdir_is_shared() {
 # Usa el hostfile y los flags configurados. Imprime la orden antes de lanzarla.
 mpi_launch() {
     local np="$1"; shift
-    local -a cmd=(mpirun)
+    local -a cmd=("$MPIEXEC")
 
     # shellcheck disable=SC2206
     cmd+=($MPI_FLAGS)
@@ -121,7 +123,7 @@ mpi_launch() {
     fi
 
     if [[ "${USE_HOSTFILE:-1}" == "1" && -f "$HOSTFILE" ]]; then
-        cmd+=(-hostfile "$HOSTFILE" --map-by "$MAP_BY" --bind-to "$BIND_TO")
+        cmd+=(--hostfile "$HOSTFILE" --map-by "$MAP_BY" --bind-to "$BIND_TO")
     fi
 
     cmd+=(-np "$np" "$@")

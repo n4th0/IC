@@ -95,9 +95,9 @@ distribuida de la Tarea 2, cuyo procedimiento para el clúster real se documenta
 <p><strong>Nota sobre el clúster.</strong> La guía pide desarrollar la práctica sobre un
 multicomputador de <strong>al menos 3 computadores</strong>. Por disponibilidad de recursos,
 el desarrollo y la toma de medidas se han hecho sobre un único nodo lanzando
-<code>mpirun</code> con varios procesos (memoria compartida emulando paso de mensajes,
+<code>mpiexec</code> con varios procesos (memoria compartida emulando paso de mensajes,
 que es el mismo modelo de programación MPI). En la Tarea 2 se documenta el
-procedimiento completo (hostfile, certificado SSH y orden <code>mpirun</code>) para
+procedimiento completo (hostfile, certificado SSH y orden <code>mpiexec</code>) para
 trasladarlo al clúster del laboratorio. Los <em>aspectos algorítmicos</em> medidos
 (comportamiento de las comunicaciones colectivas, balance de carga, coste de
 sincronización) no dependen de si los procesos residen en la misma máquina,
@@ -367,13 +367,17 @@ perfil plano y el grafo de llamadas están en <code>p3/tarea1_profiling/</code>.
 <li>Instalar Open MPI (<code>sudo apt install openmpi-bin libopenmpi-dev</code>).</li>
 <li>Compilar: <code>mpicc hello_mpi.c -o hello_mpi</code>.</li>
 <li>Mismo usuario, mismo directorio (<code>$HOME</code>) y mismo ejecutable en todos los nodos.</li>
-<li>Crear <code>hostfile</code> con la IP/nombre de cada nodo (plantilla en
-   <code>p3/tarea2_mpi/hostfile</code>); <code>chmod 600 hostfile</code>.</li>
+<li>Crear <code>hostfile</code> con una línea por nodo en formato Open MPI
+   <code>ip slots=N</code> (plantilla en <code>p3/tarea2_mpi/hostfile</code>);
+   <code>chmod 600 hostfile</code>.</li>
 <li>Certificado SSH: <code>ssh-keygen -t rsa</code> y copiar <code>~/.ssh/id_rsa.pub</code> a
    <code>~/.ssh/authorized_keys</code> de los demás nodos.</li>
 <li><code>chmod o+x hello_mpi</code> y ejecutar:</li>
 </ol>
-<pre><code class="language-bash">mpirun -mca plm_rsh_no_tree_spawn 1 -hostfile hostfile -n 6 ./hello_mpi
+<pre><code class="language-bash">mpiexec --hostfile hostfile \
+        --mca btl_tcp_if_include enp4s0 \
+        --mca oob_tcp_if_include enp4s0 \
+        -np 6 ./hello_mpi
 </code></pre>
 <h3 id="53-resultado-observado-ejecucion-local-4-procesos">5.3 Resultado observado (ejecución local, 4 procesos)</h3>
 <p><code>results/hello_local.txt</code>:</p>
@@ -385,7 +389,7 @@ perfil plano y el grafo de llamadas están en <code>p3/tarea1_profiling/</code>.
 </code></pre>
 <p>Se observa que cada proceso se reparte por núcleos distintos y que el proceso de
 rango 2 ejecuta su rama específica. (El <code>PID</code> coincide porque <code>getppid()</code> devuelve
-el proceso <code>mpirun</code> padre.)</p>
+el proceso <code>mpiexec</code> padre.)</p>
 <hr />
 <h2 id="6-tarea-3-paralelizacion-del-codigo-identificado-n-cuerpos">6. Tarea 3. Paralelización del código identificado (N cuerpos)</h2>
 <h3 id="61-analisis-de-la-solucion-secuencial">6.1 Análisis de la solución secuencial</h3>
