@@ -125,7 +125,7 @@ def main():
                 if strat == "spec" and ga >= P:
                     ga = P - 1
                 cmd = mpiexec_cmd(P, args.hostfile, args.mpiexec_extra,
-                                  args.map_by, args.bind_to, args.net_iface)
+                                  args.net_iface)
                 cmd += [os.path.join(D, "knn_mpi"), "--strategy", strat,
                         "--train", str(tr), "--test", str(args.test),
                         "--finaltrain", str(args.finaltrain),
@@ -148,7 +148,7 @@ def main():
                 if ga >= P:
                     continue
                 cmd = mpiexec_cmd(P, args.hostfile, args.mpiexec_extra,
-                                  args.map_by, args.bind_to, args.net_iface)
+                                  args.net_iface)
                 cmd += [os.path.join(D, "knn_mpi"), "--strategy", "spec",
                         "--groupA", str(ga), "--train", str(tr),
                         "--test", str(args.test),

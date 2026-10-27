@@ -22,7 +22,7 @@
 // identico al secuencial (mismo comparador de distancia y mismo desempate).
 //
 // Compilar: mpic++ -O2 -std=c++17 knn_mpi.cpp <fuentes knn2> -I<knn2> -o knn_mpi
-// Ejecutar: mpiexec -np <P> ./knn_mpi --strategy test --train 4000 --test 1500 \
+// Ejecutar: mpiexec -n <P> ./knn_mpi --strategy test --train 4000 --test 1500 \
 //                                     --finaltrain 4000 --mink 1 --maxk 10 --folds 5
 #include <mpi.h>
 

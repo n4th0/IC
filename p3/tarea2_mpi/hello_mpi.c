@@ -2,7 +2,7 @@
 // Basado en el ejemplo de la guia de la practica.
 //
 // Compilar:   mpicc hello_mpi.c -o hello_mpi
-// Ejecutar:   mpiexec --hostfile <hostfile> -np <N> ./hello_mpi
+// Ejecutar:   mpiexec -iface <iface> -f <hostfile> -n <N> ./hello_mpi
 #define _GNU_SOURCE
 #include <stdio.h>
 #include "mpi.h"

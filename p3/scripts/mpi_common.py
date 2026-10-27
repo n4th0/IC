@@ -2,7 +2,8 @@
 """Utilidades MPI compartidas por los barridos de Tarea 3 y Tarea 4.
 
 Permiten que los mismos scripts funcionen en local (sin hostfile) y en el
-multicomputador (con --hostfile), sin duplicar la construccion de 'mpiexec'.
+multicomputador (con --hostfile), sin duplicar la construccion de 'mpiexec'
+(MPICH/Hydra).
 """
 import os
 import shlex
@@ -21,8 +22,8 @@ def _host_slots(token):
 def hostfile_info(path):
     """Devuelve (lista_de_nodos, slots_totales) de un hostfile.
 
-    Acepta el formato de Open MPI ('ip slots=N') y, por comodidad, tambien
-    'ip:N' (formato de MPICH/Hydra).
+    El formato usado es el de MPICH/Hydra ('ip:N'), aunque tambien se acepta
+    'ip slots=N' por comodidad.
     """
     nodes, total = [], 0
     with open(path, "r", encoding="utf-8") as f:
@@ -64,19 +65,16 @@ def default_np_list(hostfile):
     return sorted(ps)
 
 
-def mpiexec_cmd(np, hostfile=None, extra="", map_by="node", bind_to="core",
-                net_iface=""):
-    """Construye la orden mpiexec (Open MPI) para P procesos."""
+def mpiexec_cmd(np, hostfile=None, extra="", net_iface=""):
+    """Construye la orden mpiexec (MPICH/Hydra) para P procesos."""
     cmd = ["mpiexec"]
     if extra:
         cmd += shlex.split(extra)
     if net_iface:
-        cmd += ["--mca", "btl_tcp_if_include", net_iface,
-                "--mca", "oob_tcp_if_include", net_iface]
+        cmd += ["-iface", net_iface]
     if hostfile and os.path.exists(hostfile):
-        cmd += ["--hostfile", hostfile, "--map-by", map_by,
-                "--bind-to", bind_to]
-    cmd += ["-np", str(np)]
+        cmd += ["-f", hostfile]
+    cmd += ["-n", str(np)]
     return cmd
 
 
@@ -88,7 +86,7 @@ def add_cluster_args(parser, default_results):
     """Anade las opciones comunes de cluster/local a un ArgumentParser."""
     g = parser.add_argument_group("ejecucion")
     g.add_argument("--hostfile", default=os.environ.get("HOSTFILE", ""),
-                   help="hostfile de Open MPI (si se omite, todo en localhost)")
+                   help="hostfile de MPICH (si se omite, todo en localhost)")
     g.add_argument("--np-list", default="",
                    help="lista de numeros de procesos, p.ej. '1 2 4 8'")
     g.add_argument("--results-dir", default=default_results,
@@ -96,13 +94,9 @@ def add_cluster_args(parser, default_results):
     g.add_argument("--mpiexec-extra", "--mpirun-extra", dest="mpiexec_extra",
                    default=os.environ.get("MPIEXEC_EXTRA",
                                           os.environ.get("MPIRUN_EXTRA", "")),
-                   help="flags extra para mpiexec (p.ej. -mca ...)")
-    g.add_argument("--map-by", default="node", choices=["node", "slot", "core"],
-                   help="reparto de rangos entre nodos (por defecto: node)")
-    g.add_argument("--bind-to", default="core",
-                   help="fijado de procesos a nucleos (por defecto: core)")
+                   help="flags extra para mpiexec (p.ej. -ppn 2)")
     g.add_argument("--net-iface", default=os.environ.get("NET_IFACE", ""),
-                   help="interfaz de red para Open MPI (p.ej. enp4s0)")
+                   help="interfaz de red para Hydra (p.ej. enp4s0)")
     return g
 
 

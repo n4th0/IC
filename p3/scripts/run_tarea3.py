@@ -69,7 +69,7 @@ def main():
         for n in ns:
             for P in ps:
                 cmd = mpiexec_cmd(P, args.hostfile, args.mpiexec_extra,
-                                  args.map_by, args.bind_to, args.net_iface)
+                                  args.net_iface)
                 cmd += [os.path.join(D, "nbody_mpi"), str(n), str(args.steps), part]
                 proc = subprocess.run(cmd, capture_output=True, text=True)
                 out = proc.stdout + proc.stderr

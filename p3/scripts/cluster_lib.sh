@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # cluster_lib.sh - Utilidades comunes para lanzar la Practica 3 en un
-# multicomputador (varios PCs) con Open MPI y mpiexec.
+# multicomputador (varios PCs) con MPICH y mpiexec (Hydra).
 #
 # Lo usan cluster_setup.sh y run_cluster.sh. No se ejecuta directamente.
 
@@ -20,6 +20,15 @@ log()  { printf '%s[cluster]%s %s\n' "$C_BLUE" "$C_OFF" "$*"; }
 ok()   { printf '%s[  ok  ]%s %s\n' "$C_GREEN" "$C_OFF" "$*"; }
 warn() { printf '%s[warn]%s %s\n' "$C_YELLOW" "$C_OFF" "$*" >&2; }
 die()  { printf '%s[error]%s %s\n' "$C_RED" "$C_OFF" "$*" >&2; exit 1; }
+
+# Version corta de la implementacion MPI (MPICH/Hydra).
+mpi_version() {
+    if command -v mpichversion >/dev/null 2>&1; then
+        mpichversion 2>&1 | head -n1
+    else
+        mpiexec --version 2>&1 | head -n1
+    fi
+}
 
 # --- Carga de la configuracion --------------------------------------------
 # Prioridad: $CLUSTER_ENV > scripts/cluster.env
@@ -44,8 +53,6 @@ load_config() {
     WORKDIR="${WORKDIR:-$HOME/IC}"
     SLOTS_PER_NODE="${SLOTS_PER_NODE:-4}"
     MPI_FLAGS="${MPI_FLAGS:-}"
-    MAP_BY="${MAP_BY:-node}"
-    BIND_TO="${BIND_TO:-core}"
     SYNC_MODE="${SYNC_MODE:-auto}"
     RESULTS_DIR="${RESULTS_DIR:-$P3_ROOT/results/cluster}"
     HOSTFILE="${HOSTFILE:-$P3_ROOT/hostfile}"
@@ -78,12 +85,12 @@ generate_hostfile() {
     mkdir -p "$(dirname -- "$out")"
     {
         echo "# Hostfile generado por cluster_setup.sh - NO editar a mano."
-        echo "# Formato Open MPI: <ip> slots=<nucleos>."
+        echo "# Formato MPICH/Hydra: <ip>:<nucleos>."
         echo "# Edita NODES y SLOTS_PER_NODE en scripts/cluster.env y reejecuta."
         echo "# Generado: $(date -Is)"
         local n
         for n in "${NODES[@]}"; do
-            echo "$n slots=$SLOTS_PER_NODE"
+            echo "$n:$SLOTS_PER_NODE"
         done
     } > "$out"
     chmod 600 "$out"
@@ -118,15 +125,14 @@ mpi_launch() {
     cmd+=($MPI_FLAGS)
 
     if [[ -n "$NET_IFACE" ]]; then
-        cmd+=(--mca "btl_tcp_if_include" "$NET_IFACE"
-              --mca "oob_tcp_if_include" "$NET_IFACE")
+        cmd+=(-iface "$NET_IFACE")
     fi
 
     if [[ "${USE_HOSTFILE:-1}" == "1" && -f "$HOSTFILE" ]]; then
-        cmd+=(--hostfile "$HOSTFILE" --map-by "$MAP_BY" --bind-to "$BIND_TO")
+        cmd+=(-f "$HOSTFILE")
     fi
 
-    cmd+=(-np "$np" "$@")
+    cmd+=(-n "$np" "$@")
 
     log "ejecutando: ${cmd[*]}"
     "${cmd[@]}"

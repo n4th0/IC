@@ -1,10 +1,10 @@
 # hostfile - plantilla para el multicomputador del laboratorio.
-# Formato de Open MPI: una linea por nodo (nombre o IP) con sus slots
-# (nucleos fisicos) como "slots=N". NO se usa "ip:N" (eso es MPICH/Hydra).
+# Formato de MPICH/Hydra: una linea por nodo (nombre o IP) con sus slots
+# (nucleos fisicos) como "ip:N". NO se usa "ip slots=N" (eso es Open MPI).
 # En la version automatizada NO se edita este fichero: scripts/cluster_setup.sh
 # genera p3/hostfile a partir de NODES y SLOTS_PER_NODE (scripts/cluster.env).
 #
 # Ejemplo:
-# 192.168.1.10 slots=4
-# 192.168.1.11 slots=4
-# 192.168.1.12 slots=4
+# 192.168.1.10:4
+# 192.168.1.11:4
+# 192.168.1.12:4

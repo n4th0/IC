@@ -1,7 +1,7 @@
 # Guía: ejecutar la Práctica 3 en varios PCs (cluster MPI)
 
 Esta guía explica, paso a paso, cómo lanzar **las Tareas 2, 3 y 4** en un
-multicomputador de **3 PCs** (o más) usando Open MPI, tal y como pide el
+multicomputador de **3 PCs** (o más) usando MPICH/Hydra, tal y como pide el
 enunciado. Todos los comandos están automatizados en `p3/scripts/`, pero aquí
 se explica qué hace cada uno para poder defenderlo en la memoria.
 
@@ -48,8 +48,8 @@ NET_IFACE="enp4s0"          # interfaz de red del clúster (eth0, enp3s0...)
 ```
 
 > **No se edita el hostfile a mano.** `cluster_setup.sh` lo genera a partir de
-> `NODES` y `SLOTS_PER_NODE` en `p3/hostfile`, con el formato de Open MPI:
-> `111.111.111.111 slots=4` (una línea por nodo).
+> `NODES` y `SLOTS_PER_NODE` en `p3/hostfile`, con el formato de MPICH/Hydra:
+> `111.111.111.111:4` (una línea por nodo).
 >
 > Si usáis **nombres** en lugar de IPs (`pc1`, `pc2`, `pc3`), añadidlos a
 > `/etc/hosts` en los tres PCs:
@@ -64,7 +64,7 @@ NET_IFACE="enp4s0"          # interfaz de red del clúster (eth0, enp3s0...)
 ## 1. Requisitos en los 3 PCs
 
 - Mismo **usuario** y misma contraseña (o claves SSH) en los tres.
-- Misma versión de **Open MPI** y del compilador.
+- Misma versión de **MPICH** y del compilador.
 - Todos en la **misma red local** (ping entre ellos).
 - El repositorio en la **misma ruta** (`$WORKDIR`) en los tres.
 
@@ -72,9 +72,14 @@ Instalación (en **cada** PC):
 
 ```bash
 sudo apt update
-sudo apt install -y openmpi-bin libopenmpi-dev build-essential rsync
-mpiexec --version       # debe ser la MISMA versión en los 3
+sudo apt install -y mpich build-essential rsync
+mpichversion            # debe ser la MISMA versión en los 3
+mpiexec --version
 ```
+
+> Si en algún PC también hay Open MPI, comprobad que `mpiexec` y `mpicc`
+> apuntan a MPICH (`sudo update-alternatives --config mpi`) y **recompilad**
+> los ejecutables. Los binarios de Open MPI y MPICH no son intercambiables.
 
 Comprobación de red (desde el maestro):
 
@@ -173,12 +178,12 @@ El script, en orden:
 
 1. Comprueba `mpiexec`, `mpicc`, `g++`, `ssh` y `tar` en el maestro.
 2. Verifica (y crea si hace falta) el acceso SSH sin contraseña a los 3 PCs.
-3. Comprueba que Open MPI está instalado y es **la misma versión** en los 3.
+3. Comprueba que MPICH está instalado y es **la misma versión** en los 3.
 4. Detecta si `$WORKDIR` es compartido:
    - **NFS**: no copia nada.
    - **discos separados**: copia el repo y el dataset MNIST por SSH
      (`tar | ssh`) a cada PC.
-5. Genera `p3/hostfile` con `ip slots=N` por nodo y permisos `600`.
+5. Genera `p3/hostfile` con `ip:N` por nodo y permisos `600`.
 6. Compila `hello_mpi`, `nbody_mpi`, `knn_mpi` y las versiones secuenciales
    (`p3/scripts/build_all.sh`).
 7. Verifica en cada PC que existen los ejecutables y el dataset.
@@ -189,9 +194,9 @@ Ejemplo de salida correcta:
 [  ok  ] ssh usuario@111.111.111.111
 [  ok  ] ssh usuario@222.222.222.222
 [  ok  ] ssh usuario@333.333.333.333
-[  ok  ] 111.111.111.111 -> mpiexec (Open MPI) 5.0.7
-[  ok  ] 222.222.222.222 -> mpiexec (Open MPI) 5.0.7
-[  ok  ] 333.333.333.333 -> mpiexec (Open MPI) 5.0.7
+[  ok  ] 111.111.111.111 -> MPICH Version: 4.1.2
+[  ok  ] 222.222.222.222 -> MPICH Version: 4.1.2
+[  ok  ] 333.333.333.333 -> MPICH Version: 4.1.2
 [cluster] modo de sincronizacion: nfs
 [  ok  ] hostfile creado (chmod 600)
 [  ok  ] 222.222.222.222 -> ejecutables y dataset OK
@@ -217,17 +222,13 @@ Equivale a:
 
 ```bash
 cd tarea2_mpi
-mpiexec --hostfile ../hostfile \
-        --mca btl_tcp_if_include enp4s0 \
-        --mca oob_tcp_if_include enp4s0 \
-        --map-by node \
-        -np 6 ./hello_mpi
+mpiexec -iface enp4s0 -f ../hostfile -n 6 ./hello_mpi
 ```
 
-> `NET_IFACE=enp4s0` se traduce en los dos `--mca ..._if_include`; si se deja
-> vacío, Open MPI elige la interfaz automáticamente. El hostfile debe usar
-> `ip slots=N`; las opciones `-iface`, `-f` y el formato `ip:N` son de
-> MPICH/Hydra, no de Open MPI.
+> `NET_IFACE=enp4s0` se traduce en `-iface enp4s0`; si se deja vacío, Hydra
+> elige la interfaz automáticamente. El hostfile debe usar `ip:N`; las
+> opciones `--hostfile`, `-np`, `--map-by` y `--mca` son de Open MPI y no
+> funcionan con MPICH/Hydra.
 
 Salida esperada (fijaos en el **nombre de la máquina**, que debe cambiar):
 
@@ -246,8 +247,9 @@ El script comprueba automáticamente que aparecen **al menos 2 hostnames
 distintos**; esa es la prueba de que se ha ejecutado en varios PCs. El
 resultado queda en `results/cluster/hello_cluster.txt`.
 
-> `--map-by node` es importante: sin él Open MPI llena el primer PC antes de
-> usar el segundo, y con `-np 6` podrías estar usando solo 2 PCs.
+> Hydra reparte los procesos entre los nodos del hostfile. Si queréis fijar
+> cuántos procesos lanza en cada PC, añadid `-ppn N` a `MPI_FLAGS` en
+> `cluster.env`.
 
 ---
 
@@ -279,7 +281,8 @@ speed-up en función del **número de PCs**. Para fijarla a mano:
 ```
 
 Y para el modo especulativo (`--strategy spec`) con grupos que abarquen varios
-PCs, `MAP_BY=node` reparte los rangos 0..P-1 round-robin entre los nodos.
+PCs, Hydra reparte los rangos 0..P-1 entre los nodos del hostfile. Para fijar
+cuántos procesos por nodo, añadid `-ppn N` a `MPI_FLAGS`.
 
 ### Reanudar sin repetir la preparación
 
@@ -316,20 +319,21 @@ ejecutables y CSVs.
 | `Permission denied (publickey)` | La clave no está en `~/.ssh/authorized_keys` del nodo. Repite el paso 3 y comprueba `chmod 700 ~/.ssh`, `chmod 600 ~/.ssh/authorized_keys`. |
 | `Host key verification failed` | `ssh-keygen -R <ip>` y vuelve a conectar, o usa `StrictHostKeyChecking=accept-new` (ya lo hace el script). |
 | `mpiexec was unable to launch` | El ejecutable no existe en esa ruta del nodo, o no tiene permiso: `chmod o+x programa`. |
-| `not enough slots available` | Pides más procesos que `NODES × SLOTS_PER_NODE`. Sube `SLOTS_PER_NODE` o baja `-np`. |
-| `mca_base_component_repository_open` / versiones | Open MPI distinto en los nodos. Instala la **misma** versión en los 3. |
-| Se queda colgado al arrancar | Cortafuegos. Abre los puertos TCP entre nodos (Open MPI usa 1024-65535). |
+| `not enough slots available` | Pides más procesos que `NODES × SLOTS_PER_NODE`. Sube `SLOTS_PER_NODE` o baja `-n`. |
+| Versiones de MPICH distintas | Instala la **misma** versión en los 3 y recompila (`build_all.sh`). |
+| Se queda colgado al arrancar | Cortafuegos. Abre el tráfico SSH y los puertos efímeros TCP entre nodos. |
 | `No route to host` / elige la interfaz equivocada | Pon `NET_IFACE=enp4s0` (o `eth0`, `enp3s0`, `wlan0`...) en `cluster.env`. |
-| `Option: --iface` o `Option: -f` no reconocida | Son opciones de MPICH/Hydra. En Open MPI usa `--mca btl_tcp_if_include <iface> --mca oob_tcp_if_include <iface>` y `--hostfile`. |
-| El hostfile con `ip:N` no reparte bien los slots | Open MPI espera `ip slots=N`; `ip:N` es formato de MPICH/Hydra. |
+| `Option: --hostfile` o `Option: -np` no reconocida | Son opciones de Open MPI. En MPICH/Hydra usa `-f <hostfile>` y `-n <N>`. |
+| El hostfile con `ip slots=N` no reparte bien los slots | MPICH/Hydra espera `ip:N`; `ip slots=N` es formato de Open MPI. |
+| `mpicc` compila contra Open MPI | Selecciona MPICH (`sudo update-alternatives --config mpi`) y recompila con `build_all.sh`. |
 | `train/train-images-idx3-ubyte` no encontrado | Falta el dataset en ese nodo: `knn2/get_dataset.sh` o `SYNC_MODE=copy`. |
 | `WORKDIR (...) debe coincidir...` | El repo no está en la ruta de `WORKDIR`. Clónalo ahí o cambia `WORKDIR`. |
-| Funciona con `-np 3` pero no con `-np 6` | Hostfile con `slots=1` por defecto: revisa `SLOTS_PER_NODE`. |
+| Funciona con `-n 3` pero no con `-n 6` | Revisa `SLOTS_PER_NODE` y añade `-ppn` a `MPI_FLAGS` si hace falta. |
 
 Para depurar un fallo de lanzamiento:
 
 ```bash
-mpiexec --hostfile ../hostfile -np 3 hostname
+mpiexec -f ../hostfile -n 3 hostname
 ```
 
 Si eso falla, el problema es de SSH/hostfile, no de vuestro código MPI.
@@ -350,7 +354,7 @@ Con los datos de `results/cluster/`:
    reparto de grupos en `spec`.
 5. Justificación del modelo (paso de mensajes, SPMD), estilo (grano grueso),
    comunicaciones (colectivas `Allgatherv`/`Reduce`/`Bcast`, punto a punto en
-   `spec`) y estructura (maestro con `--map-by node`).
+   `spec`) y estructura (maestro con `mpiexec`/Hydra).
 
 ---
 

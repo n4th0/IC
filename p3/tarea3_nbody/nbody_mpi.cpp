@@ -15,7 +15,7 @@
 // 0 hace de rank de E/S (imprime las estadisticas) mientras el resto calcula.
 //
 // Compilar: mpic++ -O2 -std=c++17 nbody_mpi.cpp -o nbody_mpi
-// Ejecutar: mpiexec -np <P> ./nbody_mpi <n_particles> <n_steps> [block|cyclic]
+// Ejecutar: mpiexec -n <P> ./nbody_mpi <n_particles> <n_steps> [block|cyclic]
 #include <mpi.h>
 
 #include <vector>

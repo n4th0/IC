@@ -19,13 +19,18 @@ de un multicomputador, segun los pasos de la guia de la Practica 3.
 
 ## 1. Requisitos previos
 
-Instalar una implementacion de MPI (Open MPI) y su compilador. En este repo
-se usa Open MPI; `mpiexec` y `mpirun` son equivalentes:
+Instalar MPICH y su compilador. En este repo se usa MPICH; el lanzador es
+`mpiexec` (Hydra):
 
 ```bash
-sudo apt update && sudo apt install -y openmpi-bin libopenmpi-dev
+sudo apt update && sudo apt install -y mpich build-essential
 mpiexec --version
+mpichversion
 ```
+
+> Si tambien teneis Open MPI instalado, comprobad que `mpiexec` y `mpicc`
+> apuntan a MPICH con `sudo update-alternatives --config mpi` y recompilad los
+> ejecutables. Los binarios de Open MPI y MPICH no son intercambiables.
 
 ## 2. Compilacion
 
@@ -40,14 +45,14 @@ las maquinas.
 ## 3. Archivo de hosts
 
 Fichero de texto plano con el nombre o la IP de cada nodo y sus slots (nucleos
-fisicos). El formato de Open MPI es `ip slots=N` (no `ip:N`, que es de
-MPICH/Hydra). Se usa `hostfile` (incluido) como plantilla:
+fisicos). El formato de MPICH/Hydra es `ip:N` (no `ip slots=N`, que es de
+Open MPI). Se usa `hostfile` (incluido) como plantilla:
 
 ```
 # hostfile  ->  una linea por nodo con sus slots (nucleos fisicos)
-192.168.1.10 slots=4
-192.168.1.11 slots=4
-192.168.1.12 slots=4
+192.168.1.10:4
+192.168.1.11:4
+192.168.1.12:4
 ```
 
 > En la version automatizada este fichero lo genera `scripts/cluster_setup.sh`
@@ -56,7 +61,7 @@ MPICH/Hydra). Se usa `hostfile` (incluido) como plantilla:
 Para pruebas locales (una sola maquina) se puede usar `hostfile.local`:
 
 ```
-localhost slots=16
+localhost:16
 ```
 
 Copiar el hostfile a todas las maquinas, en el mismo directorio de trabajo, y
@@ -89,21 +94,16 @@ ssh <nodo> hostname
 Desde la maquina donde se creo el certificado:
 
 ```bash
-mpiexec --hostfile hostfile \
-        --mca btl_tcp_if_include enp4s0 \
-        --mca oob_tcp_if_include enp4s0 \
-        -np 6 ./hello_mpi
+mpiexec -iface enp4s0 -f hostfile -n 6 ./hello_mpi
 ```
 
-- `--hostfile hostfile` indica los nodos y sus slots.
-- `--mca btl_tcp_if_include` y `--mca oob_tcp_if_include` fijan la interfaz de
-  red del cluster (ajusta `enp4s0` a la de tus PCs). Si se omiten, Open MPI
-  elige la interfaz automaticamente.
-- `-np <N>` numero total de procesos MPI.
+- `-iface enp4s0` fija la interfaz de red del cluster (ajustala a la de tus
+  PCs; si se omite, Hydra elige una automaticamente).
+- `-f hostfile` indica los nodos y sus slots.
+- `-n <N>` numero total de procesos MPI.
 
-> `-mca plm_rsh_no_tree_spawn 1` era necesario en versiones antiguas de Open
-> MPI; con Open MPI 5 (PRRTE) ya no se usa. Las opciones `-iface`, `-f` y el
-> hostfile `ip:N` son sintaxis de MPICH/Hydra.
+> El hostfile debe usar `ip:N`. Las opciones `--hostfile`, `-np`, `--map-by` o
+> `--mca` son de Open MPI y no funcionan con MPICH/Hydra.
 
 ### Prueba local (una sola maquina)
 

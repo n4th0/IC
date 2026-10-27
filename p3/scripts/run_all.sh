@@ -3,7 +3,7 @@
 #
 #   ./scripts/run_all.sh
 #
-# Requiere: OpenMPI (mpic++/mpiexec), g++, gprof, python3 con matplotlib y numpy,
+# Requiere: MPICH (mpic++/mpiexec), g++, gprof, python3 con matplotlib y numpy,
 # y el dataset MNIST descargado en knn2/build/{train,test} (knn2/get_dataset.sh).
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."          # p3/

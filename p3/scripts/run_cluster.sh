@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run_cluster.sh - Lanza TODA la Practica 3 (Tareas 2, 3 y 4) en un
-# multicomputador de varios PCs con Open MPI.
+# multicomputador de varios PCs con MPICH (Hydra).
 #
 #   ./scripts/run_cluster.sh                    # tareas 2 + 3 + 4
 #   ./scripts/run_cluster.sh --tarea 2          # solo el hola mundo
@@ -89,9 +89,9 @@ INFO="$RESULTS_DIR/cluster_info.txt"
     echo "Fecha            : $(date -Is)"
     echo "Nodos            : ${NODES[*]}"
     echo "Slots por nodo   : $SLOTS_PER_NODE (total $TOTAL_SLOTS)"
-    echo "Map-by / bind-to : $MAP_BY / $BIND_TO"
+    echo "Interfaz de red  : ${NET_IFACE:-(automatica)}"
     echo "Hostfile         : $HOSTFILE"
-    echo "MPI (maestro)    : $(mpiexec --version 2>&1 | head -n1)"
+    echo "MPI (maestro)    : $(mpi_version)"
     echo
     echo "== Detalle por nodo =="
     for n in "${NODES[@]}"; do
@@ -123,11 +123,9 @@ run_tarea2() {
         printf '  [dry-run] (cd %s && mpiexec %s' \
             "$P3_ROOT/tarea2_mpi" "$MPI_FLAGS"
         if [[ -n "$NET_IFACE" ]]; then
-            printf ' --mca btl_tcp_if_include %s --mca oob_tcp_if_include %s' \
-                "$NET_IFACE" "$NET_IFACE"
+            printf ' -iface %s' "$NET_IFACE"
         fi
-        printf ' --hostfile %s --map-by %s --bind-to %s -np %s ./hello_mpi)\n' \
-            "$HOSTFILE" "$MAP_BY" "$BIND_TO" "$np"
+        printf ' -f %s -n %s ./hello_mpi)\n' "$HOSTFILE" "$np"
         return
     fi
     set +e
@@ -145,7 +143,7 @@ run_tarea2() {
     grep -q "Hola" "$logf" || warn "no aparece el saludo del rango 2 (¿menos de 3 procesos?)"
     if (( nhost < 2 && N_NODES >= 2 )); then
         warn "solo se ha visto 1 hostname distinto en la salida."
-        warn "Prueba a lanzar con --np ${N_NODES} y MAP_BY=node en cluster.env."
+        warn "Prueba a lanzar con --np ${N_NODES} para repartir entre los PCs."
     else
         ok "ejecucion distribuida verificada: $nhost hostname(s) distintos"
     fi
@@ -157,8 +155,7 @@ run_tarea2() {
 # ---------------------------------------------------------------------------
 sweep_args() {
     local -a a=(--hostfile "$HOSTFILE" --results-dir "$RESULTS_DIR"
-                --mpiexec-extra="$MPI_FLAGS" --map-by "$MAP_BY"
-                --bind-to "$BIND_TO")
+                --mpiexec-extra="$MPI_FLAGS")
     [[ -n "$NET_IFACE" ]] && a+=(--net-iface "$NET_IFACE")
     [[ -n "$PS" ]] && a+=(--np-list "$PS")
     printf '%s\n' "${a[@]}"

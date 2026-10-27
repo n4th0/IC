@@ -69,10 +69,25 @@ fi
 # ---------------------------------------------------------------------------
 log "1/7 comprobando herramientas locales"
 for t in mpiexec mpicc mpic++ g++ ssh tar; do
-    command -v "$t" >/dev/null 2>&1 || die "falta '$t'. Instala Open MPI y las herramientas de compilacion:
-    sudo apt update && sudo apt install -y openmpi-bin libopenmpi-dev build-essential"
+    command -v "$t" >/dev/null 2>&1 || die "falta '$t'. Instala MPICH y las herramientas de compilacion:
+    sudo apt update && sudo apt install -y mpich build-essential"
 done
-LOCAL_MPI_VERSION="$(mpiexec --version 2>&1 | head -n1)"
+command -v mpichversion >/dev/null 2>&1 \
+    || die "no se ha encontrado 'mpichversion'. Instala MPICH:
+    sudo apt update && sudo apt install -y mpich build-essential"
+MPIEXEC_REAL="$(readlink -f "$(command -v mpiexec)" 2>/dev/null || true)"
+MPICC_REAL="$(readlink -f "$(command -v mpicc)" 2>/dev/null || true)"
+if [[ "$MPIEXEC_REAL" != *mpich* ]] && ! mpiexec --version 2>&1 | grep -qi mpich; then
+    die "mpiexec no apunta a MPICH (apunta a '$MPIEXEC_REAL'). Selecciona MPICH:
+    sudo update-alternatives --config mpi
+  o desinstala Open MPI si no lo necesitas: sudo apt remove openmpi-bin libopenmpi-dev"
+fi
+if [[ "$MPICC_REAL" != *mpich* ]] && ! mpicc -show 2>&1 | grep -qi mpich; then
+    die "mpicc no apunta a MPICH (apunta a '$MPICC_REAL'). Selecciona MPICH:
+    sudo update-alternatives --config mpi
+  y recompila los ejecutables con scripts/build_all.sh"
+fi
+LOCAL_MPI_VERSION="$(mpi_version)"
 ok "$LOCAL_MPI_VERSION"
 
 # ---------------------------------------------------------------------------
@@ -130,9 +145,9 @@ if [[ "$USE_SSH" != "0" ]] && (( ! DRY_RUN )); then
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Open MPI en todos los nodos y misma version
+# 3. MPICH en todos los nodos y misma version
 # ---------------------------------------------------------------------------
-log "3/7 comprobando Open MPI en cada nodo"
+log "3/7 comprobando MPICH en cada nodo"
 versions=()
 for n in "${NODES[@]}"; do
     if [[ "$USE_SSH" == "0" || "$n" == "localhost" ]]; then
@@ -140,11 +155,15 @@ for n in "${NODES[@]}"; do
     elif (( DRY_RUN )); then
         v="(se comprobara en la ejecucion real)"
     else
-        if ! remote "$n" "command -v mpiexec >/dev/null && command -v mpic++ >/dev/null"; then
-            die "en $n falta Open MPI. Ejecuta alli:
-    sudo apt update && sudo apt install -y openmpi-bin libopenmpi-dev"
+        if ! remote "$n" "command -v mpiexec >/dev/null && command -v mpic++ >/dev/null && command -v mpichversion >/dev/null"; then
+            die "en $n falta MPICH. Ejecuta alli:
+    sudo apt update && sudo apt install -y mpich build-essential"
         fi
-        v="$(remote "$n" "mpiexec --version 2>&1 | head -n1")"
+        if ! remote "$n" "readlink -f \$(command -v mpiexec) | grep -qi mpich || mpiexec --version 2>&1 | grep -qi mpich"; then
+            die "en $n mpiexec no apunta a MPICH. Ejecuta alli:
+    sudo update-alternatives --config mpi"
+        fi
+        v="$(remote "$n" "if command -v mpichversion >/dev/null 2>&1; then mpichversion 2>&1 | head -n1; else mpiexec --version 2>&1 | head -n1; fi")"
     fi
     versions+=("$v")
     ok "$n -> $v"
@@ -152,7 +171,7 @@ done
 # Compara la cadena de version (ignora diferencias de formato menores).
 first="${versions[0]}"
 for v in "${versions[@]}"; do
-    [[ "$v" == "$first" ]] || warn "versiones de Open MPI distintas: '$first' vs '$v'. Puede fallar el lanzamiento."
+    [[ "$v" == "$first" ]] || warn "versiones de MPICH distintas: '$first' vs '$v'. Puede fallar el lanzamiento."
 done
 
 # ---------------------------------------------------------------------------
@@ -207,7 +226,7 @@ fi
 # ---------------------------------------------------------------------------
 log "5/7 generando hostfile: $HOSTFILE"
 if (( DRY_RUN )); then
-    sed 's/^/  /' <<< "$(for n in "${NODES[@]}"; do echo "$n slots=$SLOTS_PER_NODE"; done)"
+    sed 's/^/  /' <<< "$(for n in "${NODES[@]}"; do echo "$n:$SLOTS_PER_NODE"; done)"
 else
     generate_hostfile
     ok "hostfile creado (chmod 600)"

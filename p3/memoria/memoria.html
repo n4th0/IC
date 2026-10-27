@@ -364,21 +364,24 @@ perfil plano y el grafo de llamadas están en <code>p3/tarea1_profiling/</code>.
 <h3 id="52-compilacion-y-ejecucion-en-el-cluster">5.2 Compilación y ejecución en el clúster</h3>
 <p>Procedimiento (detallado en <code>p3/tarea2_mpi/README_MPI.md</code>):</p>
 <ol>
-<li>Instalar Open MPI (<code>sudo apt install openmpi-bin libopenmpi-dev</code>).</li>
+<li>Instalar MPICH (<code>sudo apt install mpich build-essential</code>) y comprobar que
+   <code>mpiexec</code>/<code>mpicc</code> apuntan a MPICH.</li>
 <li>Compilar: <code>mpicc hello_mpi.c -o hello_mpi</code>.</li>
 <li>Mismo usuario, mismo directorio (<code>$HOME</code>) y mismo ejecutable en todos los nodos.</li>
-<li>Crear <code>hostfile</code> con una línea por nodo en formato Open MPI
-   <code>ip slots=N</code> (plantilla en <code>p3/tarea2_mpi/hostfile</code>);
+<li>Crear <code>hostfile</code> con una línea por nodo en formato MPICH/Hydra
+   <code>ip:N</code> (plantilla en <code>p3/tarea2_mpi/hostfile</code>);
    <code>chmod 600 hostfile</code>.</li>
 <li>Certificado SSH: <code>ssh-keygen -t rsa</code> y copiar <code>~/.ssh/id_rsa.pub</code> a
    <code>~/.ssh/authorized_keys</code> de los demás nodos.</li>
 <li><code>chmod o+x hello_mpi</code> y ejecutar:</li>
 </ol>
-<pre><code class="language-bash">mpiexec --hostfile hostfile \
-        --mca btl_tcp_if_include enp4s0 \
-        --mca oob_tcp_if_include enp4s0 \
-        -np 6 ./hello_mpi
+<pre><code class="language-bash">mpiexec -iface enp4s0 -f hostfile -n 6 ./hello_mpi
 </code></pre>
+<blockquote>
+<p>Las medidas de esta memoria se tomaron con Open MPI 5.0.7. La rama <code>dev</code>
+ejecuta el mismo código con MPICH/Hydra (comandos equivalentes); si se
+cambia de implementación, hay que recompilar y repetir las medidas.</p>
+</blockquote>
 <h3 id="53-resultado-observado-ejecucion-local-4-procesos">5.3 Resultado observado (ejecución local, 4 procesos)</h3>
 <p><code>results/hello_local.txt</code>:</p>
 <pre><code> PID: 9525 Hello from process 2 out of 4 on pc-n4th0 processor 10

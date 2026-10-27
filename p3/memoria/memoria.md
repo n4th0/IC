@@ -215,21 +215,23 @@ perfil plano y el grafo de llamadas están en `p3/tarea1_profiling/`.)*
 
 Procedimiento (detallado en `p3/tarea2_mpi/README_MPI.md`):
 
-1. Instalar Open MPI (`sudo apt install openmpi-bin libopenmpi-dev`).
+1. Instalar MPICH (`sudo apt install mpich build-essential`) y comprobar que
+   `mpiexec`/`mpicc` apuntan a MPICH.
 2. Compilar: `mpicc hello_mpi.c -o hello_mpi`.
 3. Mismo usuario, mismo directorio (`$HOME`) y mismo ejecutable en todos los nodos.
-4. Crear `hostfile` con una línea por nodo en formato Open MPI
-   `ip slots=N` (plantilla en `p3/tarea2_mpi/hostfile`); `chmod 600 hostfile`.
+4. Crear `hostfile` con una línea por nodo en formato MPICH/Hydra
+   `ip:N` (plantilla en `p3/tarea2_mpi/hostfile`); `chmod 600 hostfile`.
 5. Certificado SSH: `ssh-keygen -t rsa` y copiar `~/.ssh/id_rsa.pub` a
    `~/.ssh/authorized_keys` de los demás nodos.
 6. `chmod o+x hello_mpi` y ejecutar:
 
 ```bash
-mpiexec --hostfile hostfile \
-        --mca btl_tcp_if_include enp4s0 \
-        --mca oob_tcp_if_include enp4s0 \
-        -np 6 ./hello_mpi
+mpiexec -iface enp4s0 -f hostfile -n 6 ./hello_mpi
 ```
+
+> Las medidas de esta memoria se tomaron con Open MPI 5.0.7. La rama `dev`
+> ejecuta el mismo código con MPICH/Hydra (comandos equivalentes); si se
+> cambia de implementación, hay que recompilar y repetir las medidas.
 
 ### 5.3 Resultado observado (ejecución local, 4 procesos)
 
