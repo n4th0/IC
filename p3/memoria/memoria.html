@@ -369,8 +369,7 @@ perfil plano y el grafo de llamadas están en <code>p3/tarea1_profiling/</code>.
 <li>Compilar: <code>mpicc hello_mpi.c -o hello_mpi</code>.</li>
 <li>Mismo usuario, mismo directorio (<code>$HOME</code>) y mismo ejecutable en todos los nodos.</li>
 <li>Crear <code>hostfile</code> con una línea por nodo en formato MPICH/Hydra
-   <code>ip:N</code> (plantilla en <code>p3/tarea2_mpi/hostfile</code>);
-   <code>chmod 600 hostfile</code>.</li>
+   <code>ip:N</code> (plantilla en <code>p3/tarea2_mpi/hostfile</code>); <code>chmod 600 hostfile</code>.</li>
 <li>Certificado SSH: <code>ssh-keygen -t rsa</code> y copiar <code>~/.ssh/id_rsa.pub</code> a
    <code>~/.ssh/authorized_keys</code> de los demás nodos.</li>
 <li><code>chmod o+x hello_mpi</code> y ejecutar:</li>
